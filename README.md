@@ -1,36 +1,43 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Motif
 
-## Getting Started
+**A visual identity from your music.**
 
-First, run the development server:
+Drop an MP3. Meet your AI Music Director. It listens to the track, decides
+the visual identity, and produces a release kit that shares one motif:
+
+- Spotify Canvas (8s vertical loop)
+- Album cover
+- Lyric video
+- Instagram Reel
+- TikTok teaser
+
+Built for the **HeyGen Hackathon** on top of **HeyGen** (Photo Avatar) and
+**Hyperframes** (composition + render).
+
+---
+
+## Stack
+
+- **Next.js 16** + React 19 + Tailwind 4
+- **OpenAI** — Music Director Agent reasoning, Whisper transcription, vision critique, motif image generation (Fal fallback)
+- **HeyGen** — Photo Avatar clips that appear at agent-chosen moments
+- **Hyperframes** — composes every output deterministically (loop-clean Canvas + word-level lyric sync)
+
+## Setup
 
 ```bash
+cp .env.example .env.local       # fill in keys
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Tracks
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Submitting to both **Product** and **Agent** tracks. The Music Director Agent
+makes real judgment calls — which formats this track deserves, where the
+artist's avatar appears, which motif candidate wins — all visible in the
+live transcript.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Built at
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+HeyGen Hackathon, San Francisco, May 14–15.

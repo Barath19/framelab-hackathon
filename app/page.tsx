@@ -1,5 +1,5 @@
-import Editor from "./editor";
+import Studio from "./studio";
 
 export default function Home() {
-  return <Editor />;
+  return <Studio />;
 }

@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "FrameLab",
-  description: "ComfyUI for video — wire HeyGen, ElevenLabs, Fal, and Hyperframes into video pipelines.",
+  title: "Motif — A visual identity from your music",
+  description: "Drop an MP3. Meet your AI Music Director. Get a Spotify Canvas, album cover, lyric video, and social cuts — all sharing one motif. Built on HeyGen and Hyperframes.",
 };
 
 export default function RootLayout({
