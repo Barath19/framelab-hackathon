@@ -19,6 +19,7 @@ type OutputState = {
   spec: string;
   status: OutputStatus;
   mediaUrl?: string;
+  mediaType?: "image" | "video";
 };
 
 type TranscriptLine = { ts: string; tag?: string; text: string };
@@ -34,6 +35,9 @@ const initialOutputs: OutputState[] = [
 type ProduceEvent =
   | { type: "log"; ts: string; tag: string; text: string }
   | { type: "brief"; brief: { produce?: OutputKey[] } }
+  | { type: "candidate"; index: number; dataUrl: string }
+  | { type: "winner"; index: number; reason: string; dataUrl: string }
+  | { type: "output"; key: OutputKey; mediaUrl: string; mediaType: "image" | "video" }
   | { type: "done" }
   | { type: "error"; message: string };
 
@@ -44,6 +48,8 @@ export default function Studio() {
   const [transcript, setTranscript] = useState<TranscriptLine[]>([]);
   const [outputs, setOutputs] = useState<OutputState[]>(initialOutputs);
   const [activeOutput, setActiveOutput] = useState<OutputKey>("canvas");
+  const [candidates, setCandidates] = useState<(string | undefined)[]>([]);
+  const [winnerIdx, setWinnerIdx] = useState<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const transcriptEnd = useRef<HTMLDivElement>(null);
 
@@ -67,6 +73,23 @@ export default function Studio() {
           status: chosen.size === 0 || chosen.has(o.key) ? "generating" : "skipped",
         })),
       );
+    } else if (e.type === "candidate") {
+      setCandidates((prev) => {
+        const next = [...prev];
+        next[e.index] = e.dataUrl;
+        return next;
+      });
+    } else if (e.type === "winner") {
+      setWinnerIdx(e.index);
+    } else if (e.type === "output") {
+      setOutputs((prev) =>
+        prev.map((o) =>
+          o.key === e.key
+            ? { ...o, status: "ready", mediaUrl: e.mediaUrl, mediaType: e.mediaType }
+            : o,
+        ),
+      );
+      setActiveOutput(e.key);
     } else if (e.type === "done") {
       // Brief is finalized — composers (Task #16–#18) will mark items "ready"
       // individually as their media arrives. For now they stay "generating".
@@ -84,6 +107,8 @@ export default function Studio() {
     if (!file || running) return;
     setRunning(true);
     setTranscript([]);
+    setCandidates([]);
+    setWinnerIdx(null);
     setOutputs(initialOutputs.map((o) => ({ ...o, status: "generating" })));
 
     const form = new FormData();
@@ -295,19 +320,38 @@ export default function Studio() {
                   <TabsContent key={o.key} value={o.key} className="mt-0">
                     <div className="flex flex-col gap-3">
                       <div
-                        className={`${o.aspect} w-full bg-secondary border-4 border-foreground flex items-center justify-center mx-auto`}
+                        className={`${o.aspect} w-full bg-secondary border-4 border-foreground flex items-center justify-center mx-auto overflow-hidden`}
                         style={{
                           maxWidth: o.aspect === "aspect-square" ? "420px" : "260px",
                           maxHeight: "calc(100vh - 320px)",
                         }}
                       >
-                        {o.status === "ready" ? (
-                          <div className="font-pixel text-[9px] uppercase text-primary">
-                            Preview Ready
-                          </div>
+                        {o.status === "ready" && o.mediaUrl ? (
+                          o.mediaType === "video" ? (
+                            // eslint-disable-next-line jsx-a11y/media-has-caption
+                            <video
+                              src={o.mediaUrl}
+                              autoPlay
+                              loop
+                              muted
+                              playsInline
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={o.mediaUrl}
+                              alt={o.label}
+                              className="w-full h-full object-cover"
+                            />
+                          )
                         ) : o.status === "generating" ? (
                           <div className="font-pixel text-[9px] uppercase animate-pulse">
                             Generating…
+                          </div>
+                        ) : o.status === "skipped" ? (
+                          <div className="font-pixel text-[9px] uppercase opacity-50">
+                            Skipped
                           </div>
                         ) : (
                           <div className="font-pixel text-[9px] uppercase opacity-50">
@@ -318,6 +362,40 @@ export default function Studio() {
                       <div className="font-pixel text-[8px] uppercase text-center opacity-70">
                         {o.spec}
                       </div>
+
+                      {/* Motif candidate strip — visible during/after visual gen */}
+                      {o.key === "cover" && candidates.length > 0 && (
+                        <div className="mt-2">
+                          <div className="font-pixel text-[8px] uppercase opacity-70 mb-2">
+                            Motif Candidates
+                          </div>
+                          <div className="grid grid-cols-3 gap-2">
+                            {[0, 1, 2].map((i) => (
+                              <div
+                                key={i}
+                                className={`aspect-square border-4 ${
+                                  winnerIdx === i
+                                    ? "border-primary"
+                                    : "border-foreground/40"
+                                } overflow-hidden bg-secondary flex items-center justify-center`}
+                              >
+                                {candidates[i] ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    src={candidates[i]}
+                                    alt={`Candidate ${i + 1}`}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="font-pixel text-[7px] opacity-50 animate-pulse">
+                                    …
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </TabsContent>
                 ))}

@@ -1,13 +1,23 @@
 import { transcribe } from "@/lib/tools/analyze";
 import { generateMotifBrief } from "@/lib/tools/motifBrief";
+import {
+  chooseWinner,
+  generateCandidates,
+  type MotifCandidate,
+} from "@/lib/tools/visuals";
 import type { MotifBrief } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
+type OutputKey = "canvas" | "cover" | "lyric" | "reel" | "tiktok";
+
 type Event =
   | { type: "log"; ts: string; tag: string; text: string }
   | { type: "brief"; brief: MotifBrief }
+  | { type: "candidate"; index: number; dataUrl: string }
+  | { type: "winner"; index: number; reason: string; dataUrl: string }
+  | { type: "output"; key: OutputKey; mediaUrl: string; mediaType: "image" | "video" }
   | { type: "done" }
   | { type: "error"; message: string };
 
@@ -78,8 +88,27 @@ export async function POST(req: Request) {
 
         send({ type: "brief", brief });
 
-        // TODO Task #15–#19: visual gen → HeyGen avatar → Hyperframes compose → review → finalize
-        log("NEXT", "Visual generation + HeyGen avatar + Hyperframes composition — coming online.");
+        // 3) Motif visual candidates
+        const N = 3;
+        log("VISUALS", `Generating ${N} motif candidates with gpt-image-1…`);
+        const candidates: MotifCandidate[] = [];
+        for await (const c of generateCandidates(brief, N)) {
+          candidates.push(c);
+          send({ type: "candidate", index: c.index, dataUrl: c.dataUrl });
+          log("VISUALS", `Candidate ${c.index + 1}/${N} arrived.`);
+        }
+
+        // 4) Vision critique → winner
+        log("CRITIC", "Reviewing candidates against the brief…");
+        const { index: winnerIdx, reason } = await chooseWinner(brief, candidates);
+        const winner = candidates.find((c) => c.index === winnerIdx) ?? candidates[0];
+        log("CRITIC", `Candidate ${winnerIdx + 1} wins — ${reason}`);
+        send({ type: "winner", index: winnerIdx, reason, dataUrl: winner.dataUrl });
+
+        // For now the chosen motif IS the album cover. Other formats follow in #16–#18.
+        send({ type: "output", key: "cover", mediaUrl: winner.dataUrl, mediaType: "image" });
+
+        log("NEXT", "Hyperframes composition (Canvas, Lyric, Reel, TikTok) — coming online.");
 
         send({ type: "done" });
       } catch (err) {
