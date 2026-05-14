@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: #000;
+        font-family: -apple-system, "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+        color: #fff;
+        letter-spacing: -0.03em;
+      }
+
+      .stage {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        text-align: center;
+      }
+
+      .apple { font-size: 200px; font-weight: 200; line-height: 1; }
+      .apple.small { font-size: 100px; }
+
+      .eyebrow {
+        font-size: 32px;
+        color: #a1a1a6;
+        letter-spacing: 0.08em;
+        margin-bottom: 28px;
+        text-transform: uppercase;
+        font-weight: 500;
+      }
+
+      .mega {
+        font-size: 280px;
+        font-weight: 800;
+        line-height: 0.95;
+        background: linear-gradient(180deg, #ffffff 0%, #8e8e93 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      .mega .ch { display: inline-block; }
+
+      .headline {
+        font-size: 180px;
+        font-weight: 700;
+        line-height: 1;
+        background: linear-gradient(180deg, #f5f5f7 0%, #a1a1a6 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+
+      .subhead {
+        font-size: 56px;
+        font-weight: 500;
+        color: #f5f5f7;
+        margin-top: 28px;
+      }
+
+      .tagline {
+        font-size: 56px;
+        font-weight: 400;
+        color: #f5f5f7;
+        max-width: 1100px;
+      }
+
+      /* phone */
+      .phone {
+        width: 340px;
+        height: 700px;
+        border-radius: 58px;
+        background: linear-gradient(135deg, #1d1d1f 0%, #2c2c2e 50%, #1d1d1f 100%);
+        border: 4px solid #3a3a3c;
+        box-shadow: 0 40px 140px rgba(0, 200, 255, 0.22), 0 0 0 8px #0a0a0a inset;
+        position: relative;
+        overflow: hidden;
+      }
+      .phone::before {
+        content: "";
+        position: absolute;
+        top: 22px; left: 50%;
+        transform: translateX(-50%);
+        width: 120px; height: 32px;
+        background: #000;
+        border-radius: 18px;
+        z-index: 2;
+      }
+      .phone-screen {
+        position: absolute;
+        inset: 14px;
+        border-radius: 46px;
+        background:
+          radial-gradient(circle at 30% 20%, #4dd0e1 0%, transparent 50%),
+          radial-gradient(circle at 70% 80%, #7c4dff 0%, transparent 55%),
+          linear-gradient(180deg, #0a0a23 0%, #000 100%);
+      }
+      .phone-glow {
+        position: absolute;
+        inset: -100px;
+        background: radial-gradient(circle at center, rgba(125, 100, 255, 0.35) 0%, transparent 60%);
+        z-index: -1;
+      }
+
+      /* feature montage card */
+      .ftr-card { display: flex; flex-direction: column; align-items: center; }
+      .ftr-card .num {
+        font-size: 360px;
+        font-weight: 800;
+        line-height: 0.9;
+        background: linear-gradient(180deg, #ffffff 0%, #86868b 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      .ftr-card .label {
+        font-size: 36px;
+        color: #a1a1a6;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        margin-top: 12px;
+        font-weight: 500;
+      }
+
+      /* price */
+      .price-block { display: flex; flex-direction: column; align-items: center; }
+      .price-block .from {
+        font-size: 44px;
+        color: #a1a1a6;
+        letter-spacing: 0.04em;
+        margin-bottom: 16px;
+      }
+      .price-block .amount {
+        font-size: 360px;
+        font-weight: 800;
+        line-height: 0.9;
+        background: linear-gradient(180deg, #ffffff 0%, #86868b 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+
+      .endcard-date {
+        font-size: 52px;
+        font-weight: 500;
+        color: #f5f5f7;
+        margin-top: 28px;
+        letter-spacing: -0.01em;
+      }
+      .endcard-lockup {
+        font-size: 36px;
+        color: #a1a1a6;
+        letter-spacing: 0.04em;
+        margin-top: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="30"
+      data-width="1920"
+      data-height="1080"
+    >
+      <!-- 0:00–0:02   Apple logo punch -->
+      <div id="s1" class="clip stage" data-start="0" data-duration="2" data-track-index="1">
+        <div class="apple" id="s1-logo"></div>
+      </div>
+
+      <!-- 0:02–0:04   Tagline -->
+      <div id="s2" class="clip stage" data-start="2" data-duration="2" data-track-index="1">
+        <div class="tagline" id="s2-line">There's never been an iPhone like this.</div>
+      </div>
+
+      <!-- 0:04–0:06.5 "iPhone" letter reveal -->
+      <div id="s3" class="clip stage" data-start="4" data-duration="2.5" data-track-index="1">
+        <div class="mega" id="s3-word">
+          <span class="ch">i</span><span class="ch">P</span><span class="ch">h</span><span class="ch">o</span><span class="ch">n</span><span class="ch">e</span>
+        </div>
+      </div>
+
+      <!-- 0:06.5–0:08.5  "17 Pro" slam -->
+      <div id="s4" class="clip stage" data-start="6.5" data-duration="2" data-track-index="1">
+        <div class="headline" id="s4-title">17&nbsp;Pro</div>
+        <div class="subhead" id="s4-sub">Forged in titanium.</div>
+      </div>
+
+      <!-- 0:08.5–0:13   Phone hero (slow) -->
+      <div id="s5" class="clip stage" data-start="8.5" data-duration="4.5" data-track-index="1">
+        <div class="phone" id="s5-phone">
+          <div class="phone-glow" id="s5-glow"></div>
+          <div class="phone-screen"></div>
+        </div>
+      </div>
+
+      <!-- 0:13–0:13.7  Feature: A19 -->
+      <div id="s6" class="clip stage" data-start="13" data-duration="0.7" data-track-index="1">
+        <div class="ftr-card">
+          <div class="num" id="s6-num">A19</div>
+          <div class="label">BIONIC</div>
+        </div>
+      </div>
+
+      <!-- 0:13.7–0:14.4 Feature: 48MP -->
+      <div id="s7" class="clip stage" data-start="13.7" data-duration="0.7" data-track-index="1">
+        <div class="ftr-card">
+          <div class="num" id="s7-num">48</div>
+          <div class="label">MEGAPIXELS</div>
+        </div>
+      </div>
+
+      <!-- 0:14.4–0:15.1 Feature: 120 Hz -->
+      <div id="s8" class="clip stage" data-start="14.4" data-duration="0.7" data-track-index="1">
+        <div class="ftr-card">
+          <div class="num" id="s8-num">120</div>
+          <div class="label">HZ PROMOTION</div>
+        </div>
+      </div>
+
+      <!-- 0:15.1–0:15.8 Feature: 5G -->
+      <div id="s9" class="clip stage" data-start="15.1" data-duration="0.7" data-track-index="1">
+        <div class="ftr-card">
+          <div class="num" id="s9-num">5G</div>
+          <div class="label">EVERYWHERE</div>
+        </div>
+      </div>
+
+      <!-- 0:15.8–0:16.5 Feature: USB-C -->
+      <div id="s10" class="clip stage" data-start="15.8" data-duration="0.7" data-track-index="1">
+        <div class="ftr-card">
+          <div class="num" id="s10-num">USB-C</div>
+          <div class="label">THUNDERBOLT</div>
+        </div>
+      </div>
+
+      <!-- 0:16.5–0:17.2 Feature: Titanium -->
+      <div id="s11" class="clip stage" data-start="16.5" data-duration="0.7" data-track-index="1">
+        <div class="ftr-card">
+          <div class="num" id="s11-num" style="font-size: 220px">Titanium</div>
+          <div class="label">GRADE 5</div>
+        </div>
+      </div>
+
+      <!-- 0:17.2–0:19.5  "Pro. In every way." -->
+      <div id="s12" class="clip stage" data-start="17.2" data-duration="2.3" data-track-index="1">
+        <div class="headline" id="s12-text">Pro. In every way.</div>
+      </div>
+
+      <!-- 0:19.5–0:23  Phone hero return -->
+      <div id="s13" class="clip stage" data-start="19.5" data-duration="3.5" data-track-index="1">
+        <div class="phone" id="s13-phone">
+          <div class="phone-glow"></div>
+          <div class="phone-screen"></div>
+        </div>
+      </div>
+
+      <!-- 0:23–0:26  Price slam -->
+      <div id="s14" class="clip stage" data-start="23" data-duration="3" data-track-index="1">
+        <div class="price-block"><div class="from" data-hf-text-key="child:0:div">FROM</div><div class="amount" id="s14-amount" data-hf-text-key="child:1:div" style="opacity: 1; transform: translate3d(0px, 0px, 0px) scale(1.0094, 1.0094)">$11</div></div>
+      </div>
+
+      <!-- 0:26–0:30  End card -->
+      <div id="s15" class="clip stage" data-start="26" data-duration="4" data-track-index="1">
+        <div class="apple small" id="s15-logo"></div>
+        <div class="endcard-date" id="s15-date">Available September 25</div>
+        <div class="endcard-lockup" id="s15-lockup">iPhone 17 Pro</div>
+      </div>
+    </div>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+
+      // S1 — Apple logo: hard snap, micro-overshoot, hold, push-out
+      tl.fromTo("#s1-logo",
+        { scale: 0.6, opacity: 0 },
+        { scale: 1, opacity: 1, duration: 0.35, ease: "back.out(1.6)" }, 0)
+        .to("#s1-logo", { scale: 1.15, opacity: 0, duration: 0.3, ease: "power3.in" }, 1.7);
+
+      // S2 — Tagline: type-ish reveal
+      tl.fromTo("#s2-line",
+        { opacity: 0, y: 20 },
+        { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 2.05)
+        .to("#s2-line", { opacity: 0, duration: 0.25, ease: "power2.in" }, 3.75);
+
+      // S3 — "iPhone" letter stagger (fast)
+      tl.fromTo("#s3-word .ch",
+        { y: 80, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.45, stagger: 0.06, ease: "back.out(2)" }, 4.05)
+        .to("#s3-word", { scale: 1.04, duration: 1.6, ease: "sine.inOut" }, 5);
+
+      // S4 — "17 Pro" slam + subhead
+      tl.fromTo("#s4-title",
+        { scale: 0.7, opacity: 0 },
+        { scale: 1, opacity: 1, duration: 0.4, ease: "back.out(1.8)" }, 6.55)
+        .fromTo("#s4-sub",
+          { y: 30, opacity: 0 },
+          { y: 0, opacity: 1, duration: 0.4, ease: "power3.out" }, 6.95);
+
+      // S5 — Phone hero (the slow held moment)
+      tl.fromTo("#s5-phone",
+        { scale: 0.78, opacity: 0, rotateY: -25 },
+        { scale: 1, opacity: 1, rotateY: 0, duration: 1.0, ease: "power3.out" }, 8.55)
+        .fromTo("#s5-glow",
+          { opacity: 0 },
+          { opacity: 1, duration: 1.2, ease: "power2.out" }, 8.8)
+        .to("#s5-phone", { y: -16, duration: 2.0, ease: "sine.inOut", yoyo: true, repeat: 1 }, 9.6);
+
+      // S6–S11 — Rapid-fire feature montage (machine-gun cuts)
+      const ftrIds = ["#s6-num", "#s7-num", "#s8-num", "#s9-num", "#s10-num", "#s11-num"];
+      const ftrStarts = [13.05, 13.75, 14.45, 15.15, 15.85, 16.55];
+      ftrIds.forEach((sel, i) => {
+        tl.fromTo(sel,
+          { scale: 0.85, y: 30 },
+          { scale: 1, y: 0, duration: 0.25, ease: "back.out(2.2)" }, ftrStarts[i]);
+      });
+
+      // S12 — "Pro. In every way."
+      tl.fromTo("#s12-text",
+        { scale: 0.85, opacity: 0 },
+        { scale: 1, opacity: 1, duration: 0.5, ease: "back.out(1.6)" }, 17.25)
+        .to("#s12-text", { scale: 1.03, duration: 1.6, ease: "sine.inOut" }, 17.9);
+
+      // S13 — Phone hero return
+      tl.fromTo("#s13-phone",
+        { scale: 0.85, opacity: 0 },
+        { scale: 1, opacity: 1, duration: 0.7, ease: "power3.out" }, 19.55)
+        .to("#s13-phone", { rotate: 2, duration: 2.5, ease: "sine.inOut", yoyo: true, repeat: 1 }, 20.4);
+
+      // S14 — Price slam
+      tl.fromTo("#s14-amount",
+        { scale: 0.7, opacity: 0 },
+        { scale: 1, opacity: 1, duration: 0.45, ease: "back.out(1.8)" }, 23.05)
+        .to("#s14-amount", { scale: 1.06, duration: 1.8, ease: "sine.inOut" }, 23.8);
+
+      // S15 — End card
+      tl.fromTo("#s15-logo",
+        { scale: 0.8, opacity: 0 },
+        { scale: 1, opacity: 1, duration: 0.45, ease: "back.out(1.6)" }, 26.05)
+        .fromTo("#s15-date",
+          { y: 20, opacity: 0 },
+          { y: 0, opacity: 1, duration: 0.5, ease: "power3.out" }, 26.5)
+        .fromTo("#s15-lockup",
+          { y: 16, opacity: 0 },
+          { y: 0, opacity: 1, duration: 0.45, ease: "power3.out" }, 26.85);
+
+      window.__timelines["main"] = tl;
+    </script>
+  </body>
+</html>
