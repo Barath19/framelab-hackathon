@@ -31,13 +31,21 @@ const initialOutputs: OutputState[] = [
   { key: "tiktok", label: "TikTok", shortLabel: "TikTok", aspect: "aspect-[9/16]", spec: "1080×1920 · 9s", status: "queued" },
 ];
 
+type ProduceEvent =
+  | { type: "log"; ts: string; tag: string; text: string }
+  | { type: "brief"; brief: { produce?: OutputKey[] } }
+  | { type: "done" }
+  | { type: "error"; message: string };
+
 export default function Studio() {
   const [file, setFile] = useState<File | null>(null);
+  const [lyrics, setLyrics] = useState("");
   const [running, setRunning] = useState(false);
   const [transcript, setTranscript] = useState<TranscriptLine[]>([]);
   const [outputs, setOutputs] = useState<OutputState[]>(initialOutputs);
   const [activeOutput, setActiveOutput] = useState<OutputKey>("canvas");
   const fileRef = useRef<HTMLInputElement>(null);
+  const transcriptEnd = useRef<HTMLDivElement>(null);
 
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -45,32 +53,82 @@ export default function Studio() {
     if (f && f.type.startsWith("audio")) setFile(f);
   }, []);
 
+  const handleEvent = useCallback((e: ProduceEvent) => {
+    if (e.type === "log") {
+      setTranscript((prev) => [...prev, { ts: e.ts, tag: e.tag, text: e.text }]);
+      requestAnimationFrame(() =>
+        transcriptEnd.current?.scrollIntoView({ behavior: "smooth", block: "end" }),
+      );
+    } else if (e.type === "brief") {
+      const chosen = new Set(e.brief.produce ?? []);
+      setOutputs((prev) =>
+        prev.map((o) => ({
+          ...o,
+          status: chosen.size === 0 || chosen.has(o.key) ? "generating" : "skipped",
+        })),
+      );
+    } else if (e.type === "done") {
+      setOutputs((prev) =>
+        prev.map((o) => (o.status === "generating" ? { ...o, status: "ready" } : o)),
+      );
+      setRunning(false);
+    } else if (e.type === "error") {
+      setTranscript((prev) => [
+        ...prev,
+        { ts: "--:--", tag: "ERROR", text: e.message },
+      ]);
+      setRunning(false);
+    }
+  }, []);
+
   const start = async () => {
     if (!file || running) return;
     setRunning(true);
-    setTranscript([{ ts: "00:00", text: `Listening to ${file.name}…` }]);
+    setTranscript([]);
     setOutputs(initialOutputs.map((o) => ({ ...o, status: "generating" })));
 
-    // Stubbed — Task #14 will swap to /api/produce SSE.
-    const fakeLines: TranscriptLine[] = [
-      { ts: "00:02", tag: "ANALYZE", text: "BPM 117 — steady danceable. Key F# minor — unease. Energy 0.68." },
-      { ts: "00:08", tag: "MOOD", text: "Defiant. Slick. Paranoid-pop. Noir." },
-      { ts: "00:11", tag: "MOTIF", text: "Palette: cobalt > midnight > magenta > cream. Element: a glowing tile that pulses on the off-beat." },
-      { ts: "00:15", tag: "PLAN", text: "Producing all 5 formats. 117 BPM is TikTok's sweet spot." },
-      { ts: "00:18", tag: "AVATAR", text: "Sign-off at end of lyric video; intro on Reel; drop face on TikTok." },
-      { ts: "00:22", tag: "VISUALS", text: "Generating 4 motif candidates..." },
-      { ts: "00:31", tag: "CRITIC", text: "Candidate #3 wins - echo tile reads as paranoia." },
-      { ts: "00:34", tag: "HEYGEN", text: "3 avatar clips queued." },
-      { ts: "00:38", tag: "COMPOSE", text: "Hyperframes composing 5 outputs in parallel..." },
-      { ts: "01:14", tag: "REVIEW", text: "Loop closure OK. Sync drift on word 'lover' - re-rendering 2 clips." },
-      { ts: "01:21", tag: "DONE", text: "5 deliverables ready. 14 decisions, 31 tool calls, 78s." },
-    ];
-    for (const line of fakeLines) {
-      await new Promise((r) => setTimeout(r, 600));
-      setTranscript((prev) => [...prev, line]);
+    const form = new FormData();
+    form.append("file", file);
+    if (lyrics.trim()) form.append("lyrics", lyrics.trim());
+
+    let res: Response;
+    try {
+      res = await fetch("/api/produce", { method: "POST", body: form });
+    } catch (err) {
+      handleEvent({ type: "error", message: `Network error: ${(err as Error).message}` });
+      return;
     }
-    setOutputs((prev) => prev.map((o) => ({ ...o, status: "ready" })));
-    setRunning(false);
+    if (!res.ok || !res.body) {
+      handleEvent({ type: "error", message: `Server ${res.status}` });
+      return;
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      // Parse SSE: each event ends with "\n\n", lines start with "data: "
+      let nl;
+      while ((nl = buffer.indexOf("\n\n")) !== -1) {
+        const chunk = buffer.slice(0, nl);
+        buffer = buffer.slice(nl + 2);
+        const dataLines = chunk
+          .split("\n")
+          .filter((l) => l.startsWith("data:"))
+          .map((l) => l.slice(5).trim());
+        if (!dataLines.length) continue;
+        try {
+          const evt = JSON.parse(dataLines.join("\n")) as ProduceEvent;
+          handleEvent(evt);
+        } catch {
+          // ignore malformed chunk
+        }
+      }
+    }
   };
 
   return (
@@ -139,6 +197,8 @@ export default function Studio() {
                   <Textarea
                     className="w-full mt-3 min-h-28 text-base"
                     placeholder="Paste lyrics for sharper sync. Otherwise we transcribe with Whisper."
+                    value={lyrics}
+                    onChange={(e) => setLyrics(e.target.value)}
                   />
                 </details>
 
@@ -153,6 +213,7 @@ export default function Studio() {
                 <button
                   onClick={() => {
                     setFile(null);
+                    setLyrics("");
                     setTranscript([]);
                     setOutputs(initialOutputs);
                   }}
@@ -193,6 +254,7 @@ export default function Studio() {
                   </div>
                 ))
               )}
+              <div ref={transcriptEnd} />
             </div>
           </Card>
 
