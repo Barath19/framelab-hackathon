@@ -65,31 +65,39 @@ async function generateOne(prompt: string, size = "1024x1024"): Promise<string> 
 /**
  * Generate N candidate motif images in parallel.
  * Yields each as it resolves so the orchestrator can stream them to the UI.
+ *
+ * Implementation: fire all generations, push results into a buffer in their
+ * resolution order, signal a waiter when new work lands. No re-racing of
+ * already-settled promises (that was leaking AsyncHook entries).
  */
 export async function* generateCandidates(
   brief: MotifBrief,
   n = 3,
 ): AsyncGenerator<MotifCandidate, void, unknown> {
   const prompts = candidatePrompts(brief, n);
-  // Kick off all generations in parallel; surface results as they resolve.
-  const inflight = prompts.map(async (prompt, index): Promise<MotifCandidate> => {
-    const dataUrl = await generateOne(prompt);
-    return { index, prompt, dataUrl };
+  const buffer: MotifCandidate[] = [];
+  let pending = prompts.length;
+  let notify: () => void = () => {};
+  const waitForNext = () => new Promise<void>((resolve) => (notify = resolve));
+
+  prompts.forEach((prompt, index) => {
+    generateOne(prompt)
+      .then((dataUrl) => {
+        buffer.push({ index, prompt, dataUrl });
+      })
+      .catch((err) => {
+        // Skip failed candidates; log for visibility.
+        console.warn(`candidate ${index} failed:`, err);
+      })
+      .finally(() => {
+        pending--;
+        notify();
+      });
   });
-  // Race-yield as each settles.
-  const settled = new Set<number>();
-  while (settled.size < inflight.length) {
-    const winner = await Promise.race(
-      inflight.map(async (p, i) => {
-        if (settled.has(i)) return null;
-        const c = await p;
-        return c;
-      }),
-    );
-    if (winner && !settled.has(winner.index)) {
-      settled.add(winner.index);
-      yield winner;
-    }
+
+  while (pending > 0 || buffer.length > 0) {
+    if (buffer.length === 0) await waitForNext();
+    while (buffer.length > 0) yield buffer.shift()!;
   }
 }
 
