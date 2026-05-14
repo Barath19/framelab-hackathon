@@ -68,9 +68,8 @@ export default function Studio() {
         })),
       );
     } else if (e.type === "done") {
-      setOutputs((prev) =>
-        prev.map((o) => (o.status === "generating" ? { ...o, status: "ready" } : o)),
-      );
+      // Brief is finalized — composers (Task #16–#18) will mark items "ready"
+      // individually as their media arrives. For now they stay "generating".
       setRunning(false);
     } else if (e.type === "error") {
       setTranscript((prev) => [

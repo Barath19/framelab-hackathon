@@ -43,12 +43,9 @@ export async function POST(req: Request) {
           : await transcribe(file);
 
         if (transcript.text.trim().length > 0) {
-          log(
-            "LYRICS",
-            transcript.text.length > 120
-              ? transcript.text.slice(0, 120).replace(/\s+/g, " ") + "…"
-              : transcript.text.replace(/\s+/g, " "),
-          );
+          const wordCount = transcript.words.length || transcript.text.split(/\s+/).length;
+          const preview = transcript.text.replace(/\s+/g, " ").slice(0, 70).trim();
+          log("LYRICS", `${wordCount} words. "${preview}${transcript.text.length > 70 ? "…" : ""}"`);
         } else {
           log("LYRICS", "Instrumental — no vocals detected. Going purely visual.");
         }
