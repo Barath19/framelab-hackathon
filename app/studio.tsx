@@ -2,6 +2,11 @@
 
 import { useCallback, useRef, useState } from "react";
 import { Clouds } from "./clouds";
+import { Button } from "@/components/ui/8bit/button";
+import { Card } from "@/components/ui/8bit/card";
+import { Badge } from "@/components/ui/8bit/badge";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/8bit/tabs";
+import { Textarea } from "@/components/ui/8bit/textarea";
 
 type OutputKey = "canvas" | "cover" | "lyric" | "reel" | "tiktok";
 type OutputStatus = "queued" | "generating" | "ready" | "skipped";
@@ -9,23 +14,21 @@ type OutputStatus = "queued" | "generating" | "ready" | "skipped";
 type OutputState = {
   key: OutputKey;
   label: string;
+  shortLabel: string;
   aspect: string;
+  spec: string;
   status: OutputStatus;
   mediaUrl?: string;
 };
 
-type TranscriptLine = {
-  ts: string;
-  tag?: string;
-  text: string;
-};
+type TranscriptLine = { ts: string; tag?: string; text: string };
 
 const initialOutputs: OutputState[] = [
-  { key: "canvas", label: "Spotify Canvas", aspect: "aspect-[9/16]", status: "queued" },
-  { key: "cover", label: "Album Cover", aspect: "aspect-square", status: "queued" },
-  { key: "lyric", label: "Lyric Video", aspect: "aspect-[9/16]", status: "queued" },
-  { key: "reel", label: "Instagram Reel", aspect: "aspect-[9/16]", status: "queued" },
-  { key: "tiktok", label: "TikTok", aspect: "aspect-[9/16]", status: "queued" },
+  { key: "canvas", label: "Spotify Canvas", shortLabel: "Canvas", aspect: "aspect-[9/16]", spec: "1080×1920 · 8s loop", status: "queued" },
+  { key: "cover", label: "Album Cover", shortLabel: "Cover", aspect: "aspect-square", spec: "3000×3000 · still", status: "queued" },
+  { key: "lyric", label: "Lyric Video", shortLabel: "Lyric", aspect: "aspect-[9/16]", spec: "1080×1920 · full song", status: "queued" },
+  { key: "reel", label: "Instagram Reel", shortLabel: "Reel", aspect: "aspect-[9/16]", spec: "1080×1920 · 15s", status: "queued" },
+  { key: "tiktok", label: "TikTok", shortLabel: "TikTok", aspect: "aspect-[9/16]", spec: "1080×1920 · 9s", status: "queued" },
 ];
 
 export default function Studio() {
@@ -48,18 +51,18 @@ export default function Studio() {
     setTranscript([{ ts: "00:00", text: `Listening to ${file.name}…` }]);
     setOutputs(initialOutputs.map((o) => ({ ...o, status: "generating" })));
 
-    // Stubbed for now — Task #14 will swap to /api/produce SSE stream.
+    // Stubbed — Task #14 will swap to /api/produce SSE.
     const fakeLines: TranscriptLine[] = [
-      { ts: "00:02", tag: "ANALYZE", text: "BPM 117 ▸ steady danceable. Key F# minor ▸ unease. Energy 0.68 ▸ contained, confident." },
-      { ts: "00:08", tag: "MOOD", text: "Defiant • slick • paranoid-pop • noir. Night music." },
-      { ts: "00:11", tag: "MOTIF", text: "Palette: cobalt → midnight → magenta → cream. Element: a glowing tile that pulses on the off-beat. Type: Playfair Italic, condensed. Motion: stalk." },
+      { ts: "00:02", tag: "ANALYZE", text: "BPM 117 — steady danceable. Key F# minor — unease. Energy 0.68." },
+      { ts: "00:08", tag: "MOOD", text: "Defiant. Slick. Paranoid-pop. Noir." },
+      { ts: "00:11", tag: "MOTIF", text: "Palette: cobalt > midnight > magenta > cream. Element: a glowing tile that pulses on the off-beat." },
       { ts: "00:15", tag: "PLAN", text: "Producing all 5 formats. 117 BPM is TikTok's sweet spot." },
-      { ts: "00:18", tag: "AVATAR", text: "Theatrical performer → avatar as hero moment. Sign-off at end of lyric video; intro on Reel; drop face on TikTok." },
-      { ts: "00:22", tag: "VISUALS", text: "Generating 4 motif candidates…" },
-      { ts: "00:31", tag: "CRITIC", text: "Candidate #3 wins — echo tile reads as paranoia." },
-      { ts: "00:34", tag: "HEYGEN", text: "3 avatar clips queued: Reel intro, TikTok drop, sign-off." },
-      { ts: "00:38", tag: "COMPOSE", text: "Hyperframes composing 5 outputs in parallel…" },
-      { ts: "01:14", tag: "REVIEW", text: "Loop closure ✓ Sync drift on word 'lover' — re-rendering 2 clips." },
+      { ts: "00:18", tag: "AVATAR", text: "Sign-off at end of lyric video; intro on Reel; drop face on TikTok." },
+      { ts: "00:22", tag: "VISUALS", text: "Generating 4 motif candidates..." },
+      { ts: "00:31", tag: "CRITIC", text: "Candidate #3 wins - echo tile reads as paranoia." },
+      { ts: "00:34", tag: "HEYGEN", text: "3 avatar clips queued." },
+      { ts: "00:38", tag: "COMPOSE", text: "Hyperframes composing 5 outputs in parallel..." },
+      { ts: "01:14", tag: "REVIEW", text: "Loop closure OK. Sync drift on word 'lover' - re-rendering 2 clips." },
       { ts: "01:21", tag: "DONE", text: "5 deliverables ready. 14 decisions, 31 tool calls, 78s." },
     ];
     for (const line of fakeLines) {
@@ -74,43 +77,44 @@ export default function Studio() {
     <div className="relative min-h-screen w-full overflow-hidden">
       <Clouds />
 
-      {/* page content above clouds */}
       <div className="relative z-10 flex flex-col min-h-screen">
-        {/* Header */}
-        <header className="px-8 pt-6 pb-4 flex items-end justify-between">
+        {/* HEADER — pixel logo */}
+        <header className="px-8 pt-8 pb-6 flex items-end justify-between gap-6 flex-wrap">
           <div>
-            <h1 className="font-display text-5xl font-medium tracking-tight text-ink leading-none">
-              Motif
+            <h1 className="font-pixel text-3xl md:text-4xl text-foreground leading-none drop-shadow-[3px_3px_0_rgba(255,255,255,0.6)]">
+              MOTIF
             </h1>
-            <p className="font-display italic text-lg text-ink-soft mt-1">
+            <p className="mt-3 text-xl text-foreground/85">
               a visual identity from your music
             </p>
           </div>
 
-          <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.15em] text-ink-soft">
-            <span className="hidden sm:inline opacity-70">Powered by</span>
-            <Chip>HeyGen</Chip>
-            <Chip>Hyperframes</Chip>
-            <Chip>OpenAI</Chip>
+          <div className="flex items-center gap-2">
+            <span className="font-pixel text-[10px] uppercase opacity-70 mr-2">
+              Powered by
+            </span>
+            <Badge>HeyGen</Badge>
+            <Badge>Hyperframes</Badge>
+            <Badge>OpenAI</Badge>
           </div>
         </header>
 
-        {/* 3-pane workspace */}
-        <main className="flex-1 px-8 pb-8 grid grid-cols-12 gap-6 min-h-0">
-          {/* LEFT — track input */}
-          <section className="col-span-3 paper grain relative p-6 flex flex-col gap-4 min-h-0 overflow-hidden">
-            <SectionLabel>Track</SectionLabel>
+        {/* WORKSPACE */}
+        <main className="flex-1 px-8 pb-12 grid grid-cols-12 gap-8 min-h-0">
+          {/* LEFT — Track */}
+          <Card className="col-span-3 flex flex-col gap-4 p-5 min-h-0 overflow-hidden">
+            <div className="font-pixel text-[10px] uppercase opacity-80">Track</div>
 
             {!file ? (
               <div
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={onDrop}
                 onClick={() => fileRef.current?.click()}
-                className="flex-1 rounded-xl border-2 border-dashed border-paper-line hover:border-accent cursor-pointer flex flex-col items-center justify-center gap-3 p-6 text-center transition bg-paper-2/50"
+                className="flex-1 border-4 border-dashed border-foreground/70 cursor-pointer flex flex-col items-center justify-center gap-3 p-6 text-center hover:bg-secondary/60 transition-colors"
               >
-                <div className="font-display text-5xl text-ink-soft">♪</div>
-                <div className="font-display text-xl italic text-ink">Drop your MP3</div>
-                <div className="text-xs text-ink-mute">or click to browse</div>
+                <div className="font-pixel text-5xl">♪</div>
+                <div className="font-pixel text-xs">DROP MP3</div>
+                <div className="text-base opacity-70">or click to browse</div>
                 <input
                   ref={fileRef}
                   type="file"
@@ -120,31 +124,31 @@ export default function Studio() {
                 />
               </div>
             ) : (
-              <div className="flex flex-col gap-3">
-                <div className="paper-flat bg-paper-2 p-4">
-                  <SectionLabel className="mb-1">Loaded</SectionLabel>
-                  <div className="font-display text-lg italic truncate">{file.name}</div>
-                  <div className="text-xs text-ink-mute">{(file.size / 1024 / 1024).toFixed(1)} MB</div>
+              <div className="flex flex-col gap-4">
+                <div className="border-4 border-foreground bg-secondary/70 p-3">
+                  <div className="font-pixel text-[9px] uppercase opacity-70 mb-1">Loaded</div>
+                  <div className="text-base truncate">{file.name}</div>
+                  <div className="text-sm opacity-60">{(file.size / 1024 / 1024).toFixed(1)} MB</div>
                   <audio src={URL.createObjectURL(file)} controls className="w-full mt-3" />
                 </div>
 
-                <details className="paper-flat bg-paper-2 p-4">
-                  <summary className="text-[11px] uppercase tracking-[0.15em] text-ink-soft cursor-pointer">
+                <details className="border-4 border-foreground bg-secondary/70 p-3">
+                  <summary className="font-pixel text-[9px] uppercase opacity-80 cursor-pointer">
                     Lyrics (optional)
                   </summary>
-                  <textarea
-                    className="w-full mt-3 bg-transparent text-sm outline-none resize-none min-h-32 text-ink"
+                  <Textarea
+                    className="w-full mt-3 min-h-28 text-base"
                     placeholder="Paste lyrics for sharper sync. Otherwise we transcribe with Whisper."
                   />
                 </details>
 
-                <button
+                <Button
                   onClick={start}
                   disabled={running}
-                  className="rounded-xl py-3 font-display text-lg italic font-semibold bg-accent text-white hover:bg-accent-soft disabled:opacity-50 disabled:cursor-not-allowed transition shadow-sm"
+                  className="w-full text-xs"
                 >
                   {running ? "Directing…" : "Generate Motif"}
-                </button>
+                </Button>
 
                 <button
                   onClick={() => {
@@ -152,142 +156,115 @@ export default function Studio() {
                     setTranscript([]);
                     setOutputs(initialOutputs);
                   }}
-                  className="text-xs text-ink-mute hover:text-ink self-start"
+                  className="text-sm opacity-60 hover:opacity-100 self-start underline"
                 >
                   ↺ Start over
                 </button>
               </div>
             )}
-          </section>
+          </Card>
 
-          {/* CENTER — agent transcript */}
-          <section className="col-span-5 paper grain relative flex flex-col min-h-0 overflow-hidden">
-            <div className="px-6 py-4 border-b border-paper-line flex items-center gap-3">
-              <SectionLabel>Music Director</SectionLabel>
-              <span
-                className={`inline-block w-2 h-2 rounded-full ${
-                  running ? "bg-accent animate-pulse" : "bg-ink-mute"
-                }`}
-              />
-              <span className="ml-auto font-display italic text-sm text-ink-mute">
-                live reasoning
-              </span>
+          {/* CENTER — Agent transcript */}
+          <Card className="col-span-5 flex flex-col min-h-0 overflow-hidden p-0">
+            <div className="px-5 py-3 border-b-4 border-foreground bg-secondary flex items-center gap-3">
+              <span className="font-pixel text-[10px] uppercase">Music Director</span>
+              <span className={`dot ${running ? "busy" : ""}`} />
+              <span className="ml-auto text-sm opacity-70">live reasoning</span>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-6 py-5 font-mono text-sm space-y-2.5 bg-[radial-gradient(circle_at_top,_var(--paper-2),_transparent_70%)]">
+            <div className="flex-1 overflow-y-auto p-5 text-base leading-relaxed space-y-2">
               {transcript.length === 0 ? (
-                <div className="text-ink-mute text-center pt-24 font-display italic text-xl leading-relaxed">
-                  Drop a track. Hit Generate.<br />
-                  <span className="text-base not-italic font-sans tracking-wide text-ink-mute opacity-70">
+                <div className="text-center pt-20 opacity-70">
+                  <div className="font-pixel text-xs mb-3">DROP A TRACK</div>
+                  <div className="text-lg">
                     the agent will think out loud here.
-                  </span>
+                  </div>
                 </div>
               ) : (
                 transcript.map((line, i) => (
-                  <div key={i} className="flex gap-3 leading-relaxed text-ink">
-                    <span className="text-ink-mute shrink-0 w-12">[{line.ts}]</span>
+                  <div key={i} className="flex gap-3 leading-relaxed">
+                    <span className="opacity-50 shrink-0 w-12 text-sm tabular-nums">[{line.ts}]</span>
                     {line.tag && (
-                      <span className="shrink-0 text-[10px] uppercase tracking-[0.12em] text-accent bg-paper-2 border border-paper-line rounded px-1.5 py-0.5 h-fit mt-0.5">
+                      <span className="font-pixel text-[8px] uppercase tracking-wider text-primary bg-secondary border-2 border-foreground px-1.5 py-0.5 h-fit mt-1 shrink-0">
                         {line.tag}
                       </span>
                     )}
-                    <span>{line.text}</span>
+                    <span className="flex-1">{line.text}</span>
                   </div>
                 ))
               )}
             </div>
-          </section>
+          </Card>
 
-          {/* RIGHT — outputs */}
-          <section className="col-span-4 paper grain relative flex flex-col min-h-0 overflow-hidden">
-            <div className="px-6 py-4 border-b border-paper-line flex items-center gap-3">
-              <SectionLabel>Release Kit</SectionLabel>
+          {/* RIGHT — Release Kit */}
+          <Card className="col-span-4 flex flex-col min-h-0 overflow-hidden p-0">
+            <div className="px-5 py-3 border-b-4 border-foreground bg-secondary flex items-center gap-3">
+              <span className="font-pixel text-[10px] uppercase">Release Kit</span>
+              <span className="ml-auto text-sm opacity-70">5 outputs</span>
             </div>
 
-            <div className="px-6 pt-4 flex gap-1.5 flex-wrap">
-              {outputs.map((o) => (
-                <button
-                  key={o.key}
-                  onClick={() => setActiveOutput(o.key)}
-                  className={`text-xs px-2.5 py-1 rounded-md border transition ${
-                    activeOutput === o.key
-                      ? "border-accent text-ink bg-paper-2"
-                      : "border-paper-line text-ink-mute hover:text-ink"
-                  }`}
-                >
-                  <span
-                    className={`inline-block w-1.5 h-1.5 rounded-full mr-1.5 align-middle ${
-                      o.status === "ready"
-                        ? "bg-accent"
-                        : o.status === "generating"
-                        ? "bg-accent-soft animate-pulse"
-                        : o.status === "skipped"
-                        ? "bg-ink-mute opacity-50"
-                        : "bg-ink-mute"
-                    }`}
-                  />
-                  {o.label}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex-1 p-6 overflow-auto">
-              {outputs
-                .filter((o) => o.key === activeOutput)
-                .map((o) => (
-                  <div key={o.key} className="flex flex-col gap-3">
-                    <div
-                      className={`${o.aspect} w-full rounded-xl bg-paper-2 border border-paper-line flex items-center justify-center mx-auto shadow-inner`}
-                      style={{
-                        maxWidth: o.aspect === "aspect-square" ? "420px" : "280px",
-                        maxHeight: "calc(100vh - 260px)",
-                      }}
-                    >
-                      {o.status === "ready" ? (
-                        <div className="text-ink-soft text-sm font-display italic">
-                          Preview ready
-                        </div>
-                      ) : o.status === "generating" ? (
-                        <div className="text-ink-mute text-sm animate-pulse">
-                          Generating…
-                        </div>
-                      ) : (
-                        <div className="text-ink-mute text-sm font-display italic">
-                          {o.label}
-                        </div>
-                      )}
-                    </div>
-                    <div className="text-xs text-ink-mute text-center font-display italic">
-                      {o.key === "canvas" && "1080 × 1920 — 8s loop"}
-                      {o.key === "cover" && "3000 × 3000 — still"}
-                      {o.key === "lyric" && "1080 × 1920 — full song"}
-                      {o.key === "reel" && "1080 × 1920 — 15s"}
-                      {o.key === "tiktok" && "1080 × 1920 — 9s"}
-                    </div>
-                  </div>
+            <Tabs
+              value={activeOutput}
+              onValueChange={(v) => setActiveOutput(v as OutputKey)}
+              className="flex-1 flex flex-col min-h-0"
+            >
+              <TabsList className="px-5 pt-4 flex flex-wrap gap-1.5 justify-start bg-transparent">
+                {outputs.map((o) => (
+                  <TabsTrigger
+                    key={o.key}
+                    value={o.key}
+                    className="font-pixel text-[8px] uppercase tracking-wider"
+                  >
+                    <span
+                      className={`dot mr-1.5 ${
+                        o.status === "ready"
+                          ? "ok"
+                          : o.status === "generating"
+                          ? "busy"
+                          : ""
+                      }`}
+                    />
+                    {o.shortLabel}
+                  </TabsTrigger>
                 ))}
-            </div>
-          </section>
+              </TabsList>
+
+              <div className="flex-1 p-5 overflow-auto">
+                {outputs.map((o) => (
+                  <TabsContent key={o.key} value={o.key} className="mt-0">
+                    <div className="flex flex-col gap-3">
+                      <div
+                        className={`${o.aspect} w-full bg-secondary border-4 border-foreground flex items-center justify-center mx-auto`}
+                        style={{
+                          maxWidth: o.aspect === "aspect-square" ? "420px" : "260px",
+                          maxHeight: "calc(100vh - 320px)",
+                        }}
+                      >
+                        {o.status === "ready" ? (
+                          <div className="font-pixel text-[9px] uppercase text-primary">
+                            Preview Ready
+                          </div>
+                        ) : o.status === "generating" ? (
+                          <div className="font-pixel text-[9px] uppercase animate-pulse">
+                            Generating…
+                          </div>
+                        ) : (
+                          <div className="font-pixel text-[9px] uppercase opacity-50">
+                            {o.shortLabel}
+                          </div>
+                        )}
+                      </div>
+                      <div className="font-pixel text-[8px] uppercase text-center opacity-70">
+                        {o.spec}
+                      </div>
+                    </div>
+                  </TabsContent>
+                ))}
+              </div>
+            </Tabs>
+          </Card>
         </main>
       </div>
     </div>
-  );
-}
-
-function SectionLabel({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return (
-    <span
-      className={`text-[11px] uppercase tracking-[0.18em] text-ink-soft font-medium ${className}`}
-    >
-      {children}
-    </span>
-  );
-}
-
-function Chip({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="px-2 py-1 rounded-md bg-paper border border-paper-line text-ink-soft">
-      {children}
-    </span>
   );
 }
