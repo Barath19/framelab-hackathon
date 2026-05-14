@@ -2,13 +2,16 @@
 
 /* ====== Theme tokens — shadcn-compatible, mapped to our retro sky palette ====== */
 :root {
-  /* sky */
-  --sky-top: #5cc2f1;
-  --sky-mid: #7ed1f7;
-  --sky-bot: #b9e6fb;
+  /* sky + desert (Chrome-dino vibe) */
+  --sky-top: #94b9d1;
+  --sky-mid: #8eb5cf;
+  --sky-bot: #a3c4d8;
+  --sand-top: #f3d18b;
+  --sand-bot: #e8be73;
+  --speck: #a87a3d;
 
   /* shadcn tokens */
-  --background: #5cc2f1;
+  --background: #8eb5cf;
   --foreground: #2c1810;          /* dark brown — used by 8bit borders */
 
   --card: #fff5d6;                /* cream paper */
@@ -74,9 +77,12 @@
 html, body {
   background:
     linear-gradient(180deg,
-      var(--sky-top) 0%,
-      var(--sky-mid) 55%,
-      var(--sky-bot) 100%);
+      var(--sky-top)  0%,
+      var(--sky-mid) 40%,
+      var(--sky-bot) 62%,
+      var(--sand-top) 62%,
+      var(--sand-top) 70%,
+      var(--sand-bot) 100%);
   color: var(--foreground);
   font-family: var(--font-mono-pixel), "VT323", ui-monospace, monospace;
   font-size: 18px;
