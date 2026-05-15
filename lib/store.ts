@@ -19,6 +19,8 @@ const ROOT = path.resolve(process.cwd(), ".data");
 const HTML_DIR = path.join(ROOT, "compositions");
 const VIDEO_DIR = path.join(ROOT, "videos");
 const THUMB_DIR = path.join(ROOT, "thumbnails");
+const COMPOSED_DIR = path.join(ROOT, "composed");
+const RENDER_DIR = path.join(ROOT, "render-projects");
 const INDEX = path.join(ROOT, "compositions.json");
 
 export type CompositionRecord = {
@@ -36,9 +38,19 @@ export type CompositionRecord = {
 type Indexed = Omit<CompositionRecord, never>;
 
 function ensureDirs() {
-  for (const d of [ROOT, HTML_DIR, VIDEO_DIR, THUMB_DIR]) {
+  for (const d of [ROOT, HTML_DIR, VIDEO_DIR, THUMB_DIR, COMPOSED_DIR, RENDER_DIR]) {
     if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
   }
+}
+
+export function composedVideoPath(id: string): string {
+  return path.join(COMPOSED_DIR, `${id}.mp4`);
+}
+export function renderProjectDir(id: string): string {
+  return path.join(RENDER_DIR, id);
+}
+export function hasComposedVideo(id: string): boolean {
+  return fs.existsSync(composedVideoPath(id));
 }
 
 export function localVideoPath(id: string): string {

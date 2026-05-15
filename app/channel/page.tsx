@@ -251,6 +251,14 @@ export default function ChannelPage() {
                       </div>
                     </div>
                   </button>
+                  <a
+                    href={`/api/composed/${ep.id}`}
+                    download={`brief-${ep.arxivId}.mp4`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="block text-center font-pixel text-[8px] uppercase border-t-4 border-foreground bg-primary text-white py-2 hover:bg-accent-soft"
+                  >
+                    ↓ Download composed MP4
+                  </a>
                 </Card>
               ))}
             </div>

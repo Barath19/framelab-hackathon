@@ -15,6 +15,7 @@ type BriefEvent =
   | { type: "brief"; brief: { hook: string; script: string; beats: unknown[] } }
   | { type: "narrator"; videoUrl: string; durationSeconds: number }
   | { type: "composition"; id: string; previewUrl: string }
+  | { type: "composed"; id: string; downloadUrl: string }
   | { type: "done" }
   | { type: "error"; message: string };
 
@@ -53,6 +54,7 @@ export default function Studio() {
   const [narratorUrl, setNarratorUrl] = useState<string | null>(null);
   const [percent, setPercent] = useState(0);
   const [stageLabel, setStageLabel] = useState("");
+  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const transcriptEnd = useRef<HTMLDivElement>(null);
 
   const handleEvent = useCallback((e: BriefEvent) => {
@@ -75,6 +77,15 @@ export default function Studio() {
     } else if (e.type === "composition") {
       setPreviewUrl(e.previewUrl);
       setStage("done");
+    } else if (e.type === "composed") {
+      setDownloadUrl(e.downloadUrl);
+      // Trigger an automatic browser download.
+      const a = document.createElement("a");
+      a.href = e.downloadUrl;
+      a.download = `brief-${e.id}.mp4`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     } else if (e.type === "done") {
       setRunning(false);
     } else if (e.type === "error") {
@@ -99,6 +110,7 @@ export default function Studio() {
     setTranscript([]);
     setPreviewUrl(null);
     setNarratorUrl(null);
+    setDownloadUrl(null);
     setPercent(0);
     setStageLabel(isResume ? "rendering narrator" : "fetching paper");
 
@@ -289,9 +301,18 @@ export default function Studio() {
 
           {/* RIGHT — Preview */}
           <Card className="col-span-7 flex flex-col min-h-0 overflow-hidden p-0">
-            <div className="px-5 py-3 border-b-4 border-foreground bg-secondary flex items-center gap-3">
+            <div className="px-5 py-3 border-b-4 border-foreground bg-secondary flex items-center gap-3 flex-wrap">
               <span className="font-pixel text-[10px] uppercase">Preview</span>
-              <span className="ml-auto flex items-center gap-2 text-sm">
+              <span className="ml-auto flex items-center gap-2 text-sm flex-wrap">
+                {downloadUrl && (
+                  <a
+                    href={downloadUrl}
+                    download
+                    className="font-pixel text-[8px] uppercase px-2 py-1 border-2 border-foreground bg-primary text-white hover:bg-accent-soft"
+                  >
+                    ↓ Download MP4
+                  </a>
+                )}
                 {previewUrl ? (
                   <>
                     <span className="font-pixel text-[8px] uppercase px-1.5 py-0.5 border-2 border-foreground bg-foreground text-secondary">

@@ -5,11 +5,13 @@ import { buildComposition } from "@/lib/tools/compose";
 import {
   downloadAsset,
   getComposition,
+  hasComposedVideo,
   hasLocalVideo,
   localThumbPath,
   localVideoPath,
   saveComposition,
 } from "@/lib/store";
+import { renderComposition } from "@/lib/tools/render";
 import type { ArxivPaper } from "@/lib/tools/arxiv";
 import type { Brief } from "@/lib/tools/brief";
 
@@ -23,6 +25,7 @@ type Event =
   | { type: "brief"; brief: Brief }
   | { type: "narrator"; videoUrl: string; durationSeconds: number }
   | { type: "composition"; id: string; previewUrl: string }
+  | { type: "composed"; id: string; downloadUrl: string }
   | { type: "done" }
   | { type: "error"; message: string };
 
@@ -90,11 +93,7 @@ export async function POST(req: Request) {
               durationSeconds: cached.durationSeconds || 20,
             });
             saveComposition(
-              {
-                ...cached,
-                narratorUrl: localUrl,
-                pending: false,
-              },
+              { ...cached, narratorUrl: localUrl, pending: false },
               html,
             );
             send({
@@ -102,8 +101,28 @@ export async function POST(req: Request) {
               videoUrl: localUrl,
               durationSeconds: cached.durationSeconds || 20,
             });
-            progress(100, "done");
             send({ type: "composition", id: videoId, previewUrl: `/api/compositions/${videoId}` });
+
+            // Render the composed MP4 (avatar + chyron + beats) — auto-downloads on the client.
+            if (hasComposedVideo(videoId)) {
+              log("RENDER", "Composed MP4 already on disk.");
+            } else {
+              log("RENDER", "Rendering composed MP4 with Hyperframes headless…");
+              try {
+                await renderComposition({
+                  id: videoId,
+                  html,
+                  onLog: (l) => log("RENDER", l),
+                });
+                log("RENDER", "Composed MP4 ready.");
+              } catch (err) {
+                log("RENDER", `failed: ${err instanceof Error ? err.message : String(err)}`);
+              }
+            }
+            if (hasComposedVideo(videoId)) {
+              send({ type: "composed", id: videoId, downloadUrl: `/api/composed/${videoId}` });
+            }
+            progress(100, "done");
             send({ type: "done" });
             controller.close();
             return;
@@ -235,9 +254,26 @@ export async function POST(req: Request) {
 
         const previewUrl = `/api/compositions/${videoId}`;
         log("COMPOSE", `Composition ready — ${html.length} bytes. Previewing…`);
-        progress(100, "done");
         send({ type: "composition", id: videoId, previewUrl });
 
+        // Render the composed MP4 in this same request — short clips render in
+        // well under a minute and the client autodownloads when it arrives.
+        log("RENDER", "Rendering composed MP4 with Hyperframes headless…");
+        try {
+          await renderComposition({
+            id: videoId,
+            html,
+            onLog: (l) => log("RENDER", l),
+          });
+          log("RENDER", "Composed MP4 ready.");
+        } catch (err) {
+          log("RENDER", `failed: ${err instanceof Error ? err.message : String(err)}`);
+        }
+        if (hasComposedVideo(videoId)) {
+          send({ type: "composed", id: videoId, downloadUrl: `/api/composed/${videoId}` });
+        }
+
+        progress(100, "done");
         send({ type: "done" });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
