@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 /**
- * Seed PostHog with ~30 days of realistic FrameLab events so the NorthStar
- * pipeline has a story to tell:
+ * Seed PostHog with a realistic 90-day SaaS product story:
  *
- *   • daily user growth from ~5 → ~80 DAU
- *   • events: signup, $pageview, video_rendered, source_connected, upgraded
- *   • a "launch spike" mid-window (cohort doubles for 2 days)
- *   • a milestone day where the 1,000th video is rendered
+ *   • 500 unique users (`m_001` … `m_500`) on an exponential growth curve
+ *   • per-day events: signup, $pageview (multiple), feature_used
+ *   • paid lifecycle: subscription_started (plan + monthly_value),
+ *     subscription_canceled, payment_received (with $revenue)
+ *   • realistic retention decay + churn
  *
- * Deterministic (seeded RNG) so reruns produce the same arc.
+ * Hits PostHog's /batch/ ingest endpoint with the public phc_ key.
+ * Deterministic (seeded RNG) — re-runs produce the same arc.
  *
  *   node scripts/seed-posthog.mjs
  */
@@ -16,179 +17,201 @@
 import fs from "node:fs";
 
 const env = Object.fromEntries(
-  fs
-    .readFileSync(new URL("../.env.local", import.meta.url), "utf8")
+  fs.readFileSync(new URL("../.env.local", import.meta.url), "utf8")
     .split("\n")
-    .filter((l) => l && !l.startsWith("#"))
-    .map((l) => {
-      const i = l.indexOf("=");
-      return [l.slice(0, i).trim(), l.slice(i + 1).trim()];
-    }),
+    .filter((l) => l && !l.startsWith("#") && l.includes("="))
+    .map((l) => { const i = l.indexOf("="); return [l.slice(0, i).trim(), l.slice(i + 1).trim()]; }),
 );
+const HOST = (env.POSTHOG_HOST || "https://us.i.posthog.com").replace(/\/+$/, "");
+const KEY = env.POSTHOG_PROJECT_API_KEY;
+if (!KEY?.startsWith("phc_")) { console.error("POSTHOG_PROJECT_API_KEY missing"); process.exit(1); }
 
-const HOST = env.POSTHOG_HOST?.replace(/\/+$/, "") || "https://us.i.posthog.com";
-const API_KEY = env.POSTHOG_PROJECT_API_KEY;
-if (!API_KEY || !API_KEY.startsWith("phc_")) {
-  console.error("Missing POSTHOG_PROJECT_API_KEY (phc_...) in .env.local");
-  process.exit(1);
-}
-
-const DAYS = 30;
+const DAYS = 90;
 const NOW = Date.now();
-const DAY_MS = 86_400_000;
+const DAY = 86_400_000;
+const TARGET = 500;
 
-// Seeded RNG (mulberry32) → deterministic story.
 function rng(seed) {
   let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
+  return () => { a=(a+0x6d2b79f5)|0; let t=Math.imul(a^(a>>>15),1|a); t=(t+Math.imul(t^(t>>>7),61|t))^t; return ((t^(t>>>14))>>>0)/4294967296; };
 }
-const rnd = rng(424242);
-const pick = (arr) => arr[Math.floor(rnd() * arr.length)];
+const r = rng(20260515);
+const pick = (a) => a[Math.floor(r() * a.length)];
+const pad = (n, w=3) => String(n).padStart(w, "0");
 
-// Distinct users grow over the window. Each user is born on a day, then
-// returns with declining-but-stochastic probability afterwards.
-const PLANS = ["free", "free", "free", "free", "pro"]; // skewed
-const SOURCES = ["arxiv", "github", "news"];
-const COUNTRIES = ["US", "US", "GB", "DE", "IN", "BR", "CA", "FR", "JP"];
+const PLANS = [
+  { id: "starter",    monthly: 19,  weight: 0.55 },
+  { id: "pro",        monthly: 99,  weight: 0.30 },
+  { id: "team",       monthly: 499, weight: 0.15 },
+];
+function pickPlan() {
+  const x = r();
+  let acc = 0;
+  for (const p of PLANS) { acc += p.weight; if (x < acc) return p; }
+  return PLANS[0];
+}
 
-const users = []; // { id, born_day, plan, country }
-const targetTotal = 150;
-const launchDay = 18; // 0-indexed
-for (let i = 0; i < targetTotal; i++) {
-  // skew births early-to-mid, with a spike on launchDay+0 and +1
-  let day = Math.floor(rnd() * DAYS);
-  if (rnd() < 0.18) day = launchDay + (rnd() < 0.5 ? 0 : 1);
+const FEATURES = ["render_video", "connect_source", "export_mp4", "share_link", "schedule_brief"];
+const COUNTRIES = ["US","US","US","GB","DE","IN","BR","CA","FR","JP","AU","ES","NL","SE"];
+const REFERRERS = ["twitter","hackernews","google","direct","producthunt","linkedin","reddit","newsletter"];
+
+/**
+ * Generate users. Births skew toward the recent end (exponential growth)
+ * with a launch spike around day 72 (a "Product Hunt" moment).
+ */
+const users = [];
+for (let i = 0; i < TARGET; i++) {
+  // Exponential birth skew: more users born recently.
+  const u = r();
+  let bornDay = Math.floor(Math.pow(u, 1.8) * DAYS);
+  if (r() < 0.18) bornDay = 72 + (r() < 0.5 ? 0 : 1); // launch spike
+  if (r() < 0.06) bornDay = 85 + Math.floor(r() * 3); // a tail post-launch
+  bornDay = Math.max(0, Math.min(DAYS - 1, bornDay));
+
+  // Lifespan = how many days they stay active (0-1 prob each day decays)
+  const baseStickiness = 0.18 + r() * 0.42; // 0.18–0.60 daily-active probability seed
   users.push({
-    id: `u_${i + 1}`,
-    born_day: day,
-    plan: pick(PLANS),
+    id: `m_${pad(i + 1)}`,
+    born: bornDay,
+    stickiness: baseStickiness,
     country: pick(COUNTRIES),
+    referrer: pick(REFERRERS),
+    paid: null, // {plan, day, canceledDay?}
   });
 }
-users.sort((a, b) => a.born_day - b.born_day);
+users.sort((a, b) => a.born - b.born);
 
 const batch = [];
-
-function ts(dayIdx, hour) {
-  const t = NOW - (DAYS - dayIdx) * DAY_MS + hour * 3600_000;
-  return new Date(t).toISOString();
+function evt(name, distinctId, dayIdx, hour, props = {}) {
+  const t = NOW - (DAYS - dayIdx) * DAY + hour * 3600_000 + Math.floor(r() * 3600_000);
+  batch.push({
+    event: name,
+    distinct_id: distinctId,
+    timestamp: new Date(t).toISOString(),
+    properties: { ...props, $lib: "framelab-saas-seeder" },
+  });
 }
 
-let videosRendered = 0;
-let renderedMilestoneFired = false;
+// Walk each day and generate events.
+let cumulativeMrr = 0;
+const dayMetrics = []; // for sanity check
 
 for (let d = 0; d < DAYS; d++) {
-  // 1) signups for users born today
-  for (const u of users.filter((u) => u.born_day === d)) {
-    const hour = Math.floor(rnd() * 6) + 8; // morning-ish
-    batch.push({
-      event: "signup",
-      distinct_id: u.id,
-      timestamp: ts(d, hour),
-      properties: {
-        plan: u.plan,
-        $geoip_country_code: u.country,
-        referrer: pick(["organic", "twitter", "hackernews", "google", "direct"]),
-      },
+  let dauSet = new Set();
+  let mrrDelta = 0;
+
+  // Signups for users born today
+  for (const u of users.filter((u) => u.born === d)) {
+    const hour = 8 + Math.floor(r() * 12);
+    evt("signup", u.id, d, hour, {
+      plan: "free",
+      $geoip_country_code: u.country,
+      referrer: u.referrer,
     });
+    // First-session: a burst of pageviews
+    const burst = 3 + Math.floor(r() * 6);
+    for (let k = 0; k < burst; k++) {
+      evt("$pageview", u.id, d, hour, { $current_url: pick(["https://framelab.app/", "https://framelab.app/dashboard", "https://framelab.app/sources"]) });
+    }
+    dauSet.add(u.id);
   }
 
-  // 2) returning activity: every existing user has some chance of being active
-  for (const u of users.filter((u) => u.born_day <= d)) {
-    const age = d - u.born_day;
-    // Pro users are stickier; everyone decays.
-    const baseP = u.plan === "pro" ? 0.55 : 0.32;
-    const decay = Math.exp(-age / 14);
-    const dailyP = baseP * decay + 0.04;
-    if (rnd() < dailyP) {
-      const hour = Math.floor(rnd() * 14) + 7;
-      // pageview
-      batch.push({
-        event: "$pageview",
-        distinct_id: u.id,
-        timestamp: ts(d, hour),
-        properties: { $current_url: "https://framelab.app/" },
+  // Returning activity + paid lifecycle
+  for (const u of users.filter((u) => u.born <= d)) {
+    const age = d - u.born;
+    if (age === 0) continue; // already counted in signup burst
+
+    // If canceled, skip eligibility entirely
+    if (u.paid?.canceledDay != null && u.paid.canceledDay <= d) {
+      // still might churn-back? skip
+      continue;
+    }
+
+    // Daily-active prob: stickiness × decay × (paid users stickier)
+    const decay = Math.exp(-age / 35);
+    const paidBoost = u.paid ? 1.6 : 1.0;
+    const p = u.stickiness * decay * paidBoost + 0.05;
+    if (r() > p) continue;
+
+    dauSet.add(u.id);
+    const hour = 7 + Math.floor(r() * 14);
+    const views = 1 + Math.floor(r() * 4);
+    for (let v = 0; v < views; v++) {
+      evt("$pageview", u.id, d, hour, { $current_url: pick(["https://framelab.app/dashboard","https://framelab.app/renders","https://framelab.app/sources","https://framelab.app/billing"]) });
+    }
+    if (r() < 0.35) {
+      evt("feature_used", u.id, d, hour, { feature: pick(FEATURES) });
+    }
+
+    // Upgrade path: free → paid sometime after day 3
+    if (!u.paid && age >= 3 && r() < 0.022) {
+      const plan = pickPlan();
+      u.paid = { plan, day: d, canceledDay: null };
+      evt("subscription_started", u.id, d, hour, {
+        plan: plan.id,
+        monthly_value: plan.monthly,
+        $revenue: plan.monthly,
       });
-      // sometimes connect a source
-      if (rnd() < 0.18) {
-        batch.push({
-          event: "source_connected",
-          distinct_id: u.id,
-          timestamp: ts(d, hour),
-          properties: { source: pick(SOURCES) },
-        });
-      }
-      // sometimes render a video
-      if (rnd() < 0.45) {
-        videosRendered += 1;
-        const evt = {
-          event: "video_rendered",
-          distinct_id: u.id,
-          timestamp: ts(d, hour + Math.floor(rnd() * 2)),
-          properties: {
-            source: pick(SOURCES),
-            duration_seconds: 20,
-            video_number: videosRendered,
-          },
-        };
-        if (!renderedMilestoneFired && videosRendered >= 1000) {
-          renderedMilestoneFired = true;
-          evt.properties.milestone = "1000th_video_rendered";
-        }
-        batch.push(evt);
-      }
-      // free → pro upgrade
-      if (u.plan === "free" && age > 3 && rnd() < 0.012) {
-        u.plan = "pro";
-        batch.push({
-          event: "upgraded",
-          distinct_id: u.id,
-          timestamp: ts(d, hour + 3),
-          properties: { from: "free", to: "pro", mrr_delta: 19 },
-        });
-      }
+      evt("payment_received", u.id, d, hour, {
+        plan: plan.id,
+        $revenue: plan.monthly,
+      });
+      mrrDelta += plan.monthly;
+    }
+
+    // Monthly renewal for paid users
+    if (u.paid && age > 0 && (d - u.paid.day) % 30 === 0 && d > u.paid.day) {
+      evt("payment_received", u.id, d, hour, { plan: u.paid.plan.id, $revenue: u.paid.plan.monthly });
+    }
+
+    // Cancellation — small daily prob for paid users
+    if (u.paid && !u.paid.canceledDay && r() < 0.004) {
+      u.paid.canceledDay = d;
+      evt("subscription_canceled", u.id, d, hour, {
+        plan: u.paid.plan.id,
+        monthly_value: u.paid.plan.monthly,
+        $revenue: -u.paid.plan.monthly,
+      });
+      mrrDelta -= u.paid.plan.monthly;
     }
   }
+
+  cumulativeMrr += mrrDelta;
+  dayMetrics.push({ d, dau: dauSet.size, mrr: cumulativeMrr });
 }
 
-// Sort by time for sanity in the activity feed.
 batch.sort((a, b) => (a.timestamp < b.timestamp ? -1 : 1));
 
-console.log(`Built ${batch.length} events across ${DAYS} days.`);
-console.log(`  signups:           ${batch.filter((e) => e.event === "signup").length}`);
-console.log(`  pageviews:         ${batch.filter((e) => e.event === "$pageview").length}`);
-console.log(`  source_connected:  ${batch.filter((e) => e.event === "source_connected").length}`);
-console.log(`  video_rendered:    ${batch.filter((e) => e.event === "video_rendered").length}`);
-console.log(`  upgraded:          ${batch.filter((e) => e.event === "upgraded").length}`);
-console.log(`Unique users:        ${new Set(batch.map((e) => e.distinct_id)).size}`);
+console.log(`Generated ${batch.length} events across ${DAYS} days.`);
+const counts = batch.reduce((acc, e) => { acc[e.event] = (acc[e.event] || 0) + 1; return acc; }, {});
+for (const [name, n] of Object.entries(counts).sort((a, b) => b[1] - a[1])) {
+  console.log(`  ${name.padEnd(24)} ${n}`);
+}
+console.log(`Unique users: ${new Set(batch.map((e) => e.distinct_id)).size}`);
+console.log(`DAU at end:   ${dayMetrics.at(-1).dau}`);
+console.log(`MRR at end:   $${dayMetrics.at(-1).mrr.toLocaleString()}/mo  · ARR ~$${(dayMetrics.at(-1).mrr * 12).toLocaleString()}`);
+console.log(`Peak DAU:     ${Math.max(...dayMetrics.map((x) => x.dau))}`);
 
-// Send in chunks — PostHog accepts up to several thousand per batch.
+// Push in chunks.
 const CHUNK = 500;
+let pushed = 0;
 for (let i = 0; i < batch.length; i += CHUNK) {
   const chunk = batch.slice(i, i + CHUNK);
   const res = await fetch(`${HOST}/batch/`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      api_key: API_KEY,
+      api_key: KEY,
       historical_migration: true,
-      batch: chunk.map((e) => ({
-        ...e,
-        properties: { ...e.properties, $lib: "framelab-seeder" },
-      })),
+      batch: chunk,
     }),
   });
   if (!res.ok) {
-    console.error(`Chunk ${i / CHUNK + 1} failed: ${res.status} ${await res.text()}`);
+    console.error(`chunk ${i / CHUNK + 1} failed: ${res.status} ${await res.text()}`);
     process.exit(1);
   }
+  pushed += chunk.length;
   process.stdout.write(`. `);
 }
-
-console.log(`\n✓ Seeded ${batch.length} events to ${HOST}.`);
-console.log(`  Allow ~10-30s for PostHog ingest to surface them in queries.`);
+console.log(`\n✓ Pushed ${pushed} events to ${HOST}.`);
+console.log("  Allow ~30-60s for PostHog ingest to surface them in queries.");

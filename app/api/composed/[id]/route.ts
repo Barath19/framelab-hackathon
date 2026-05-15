@@ -16,7 +16,7 @@ export async function GET(
     headers: {
       "Content-Type": "video/mp4",
       "Content-Length": String(stat.size),
-      "Content-Disposition": `attachment; filename="brief-${id}.mp4"`,
+      "Content-Disposition": `attachment; filename="morning-${id}.mp4"`,
       "Cache-Control": "public, max-age=31536000, immutable",
     },
   });

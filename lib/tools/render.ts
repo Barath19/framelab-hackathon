@@ -1,15 +1,8 @@
 /**
  * Render a Hyperframes composition HTML to MP4 using the Hyperframes CLI.
- *
- * We write the HTML + a minimal hyperframes.json into .data/render-projects/<id>/
- * and run `npx hyperframes render --output …`. Hyperframes spins up headless
- * Chromium under the hood, plays the timeline deterministically, and captures
- * frames into a real MP4.
- *
- * The narrator <video> in our composition references /api/videos/<id> served
- * by Next on localhost. Hyperframes' headless browser CAN fetch it as long as
- * the dev server is running on the same host:port — we pass NEXT_PUBLIC_BASE
- * (or fall back to http://localhost:3000) so absolute URLs work.
+ * Writes the HTML + a minimal hyperframes.json into a per-id project dir
+ * and runs `npx hyperframes render`. Headless Chromium under the hood;
+ * the artifact is a real MP4.
  */
 
 import { spawn } from "node:child_process";
@@ -24,7 +17,7 @@ import {
 const BASE = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
 
 function rewriteRelativeUrls(html: string): string {
-  // Make /api/... paths absolute so headless Chromium can fetch them.
+  // /api/... paths become absolute so headless Chromium can fetch them.
   return html
     .replace(/src="\/api\//g, `src="${BASE}/api/`)
     .replace(/href="\/api\//g, `href="${BASE}/api/`);
@@ -49,7 +42,7 @@ export async function renderComposition(opts: {
   fs.writeFileSync(
     path.join(dir, "hyperframes.json"),
     JSON.stringify(
-      { id, name: `brief-${id}`, width: 1920, height: 1080, fps: 30 },
+      { id, name: `morning-${id}`, width: 1920, height: 1080, fps: 30 },
       null,
       2,
     ),
@@ -57,7 +50,7 @@ export async function renderComposition(opts: {
   );
   fs.writeFileSync(
     path.join(dir, "meta.json"),
-    JSON.stringify({ id, name: `brief-${id}` }, null, 2),
+    JSON.stringify({ id, name: `morning-${id}` }, null, 2),
     "utf8",
   );
 
