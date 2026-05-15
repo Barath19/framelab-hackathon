@@ -15,6 +15,7 @@ export type ArxivFigure = {
 };
 
 export type ArxivPaper = {
+  kind: "arxiv";
   id: string;
   url: string;
   title: string;
@@ -81,6 +82,7 @@ export async function fetchArxivPaper(input: string): Promise<ArxivPaper> {
   }
 
   return {
+    kind: "arxiv",
     id,
     url: `https://arxiv.org/abs/${id}`,
     title,

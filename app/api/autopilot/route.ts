@@ -95,7 +95,7 @@ export async function POST(req: Request) {
               : clip.thumbnailUrl;
 
             const html = buildComposition({
-              paper,
+              source: paper,
               brief,
               narratorUrl: localNarrator,
               durationSeconds: clip.durationSeconds,

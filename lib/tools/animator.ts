@@ -19,7 +19,8 @@
  */
 
 import { openai } from "../openai";
-import type { ArxivPaper } from "./arxiv";
+import type { Source } from "./source";
+import { sourceBody } from "./source";
 
 export type Animation = {
   html: string;
@@ -74,14 +75,18 @@ DON'T
 - Do not exceed ~6 seconds of animation including holds.`;
 
 export async function animateBeat(opts: {
-  paper: ArxivPaper;
+  source: Source;
   beatId: string;
   intent: string;
   durationSeconds: number;
 }): Promise<Animation> {
-  const { paper, beatId, intent, durationSeconds } = opts;
-  const userMsg = `Paper: "${paper.title}" (${paper.id})
-Abstract: ${paper.abstract.slice(0, 800)}
+  const { source, beatId, intent, durationSeconds } = opts;
+  const sourceLine =
+    source.kind === "arxiv"
+      ? `Paper: "${source.title}" (${source.id})`
+      : `Article: "${source.title}" — ${source.source || "(source)"}`;
+  const userMsg = `${sourceLine}
+${source.kind === "arxiv" ? "Abstract" : "Lede"}: ${sourceBody(source).slice(0, 800)}
 
 Beat id: ${beatId}    (use #${beatId}-... for every element id)
 Duration budget: ~${durationSeconds.toFixed(1)}s

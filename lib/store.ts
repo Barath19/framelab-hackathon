@@ -12,8 +12,8 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import type { ArxivPaper } from "./tools/arxiv";
 import type { Brief } from "./tools/brief";
+import type { Source } from "./tools/source";
 
 const ROOT = path.resolve(process.cwd(), ".data");
 const HTML_DIR = path.join(ROOT, "compositions");
@@ -25,7 +25,7 @@ const INDEX = path.join(ROOT, "compositions.json");
 
 export type CompositionRecord = {
   id: string;
-  paper: ArxivPaper;
+  paper: Source;
   brief: Brief;
   narratorUrl: string;
   thumbnailUrl?: string;

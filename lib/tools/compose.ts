@@ -14,8 +14,9 @@
  */
 
 import type { Beat, Brief } from "./brief";
-import type { ArxivPaper } from "./arxiv";
 import type { Animation } from "./animator";
+import type { Source } from "./source";
+import { sourceFigures, sourceKindLabel, sourceMetaLine } from "./source";
 
 const escapeHtml = (s: string) =>
   s
@@ -27,11 +28,12 @@ const escapeHtml = (s: string) =>
 
 function beatHtml(
   b: Beat,
-  paper: ArxivPaper,
+  source: Source,
   index: number,
   durSec: number,
   animation?: Animation,
 ) {
+  const figs = sourceFigures(source);
   const id = `b${index}`;
   const common = `id="${id}" class="clip beat" data-start="${b.at}" data-duration="${durSec}" data-track-index="2"`;
 
@@ -54,15 +56,15 @@ function beatHtml(
       return `
 <div ${common}>
   <div class="title-card">
-    <div class="paper-id">${escapeHtml(paper.id)} · ${escapeHtml(paper.publishedAt.slice(0, 4))}</div>
-    <h1 class="paper-title">${escapeHtml(paper.title)}</h1>
-    <div class="paper-authors">${escapeHtml(paper.authors.slice(0, 6).join(" · "))}${
-      paper.authors.length > 6 ? " et al." : ""
+    <div class="paper-id">${escapeHtml(sourceMetaLine(source))}</div>
+    <h1 class="paper-title">${escapeHtml(source.title)}</h1>
+    <div class="paper-authors">${escapeHtml((source.authors ?? []).slice(0, 6).join(" · "))}${
+      (source.authors ?? []).length > 6 ? " et al." : ""
     }</div>
   </div>
 </div>`;
     case "figure": {
-      const fig = paper.figures[b.show.index];
+      const fig = figs[b.show.index];
       if (!fig) return "";
       return `
 <div ${common}>
@@ -92,8 +94,10 @@ function beatHtml(
       return `
 <div ${common}>
   <div class="cta-card">
-    <div class="cta-eyebrow">Read the full paper</div>
-    <div class="cta-url">arxiv.org/abs/${escapeHtml(paper.id)}</div>
+    <div class="cta-eyebrow">${source.kind === "arxiv" ? "Read the full paper" : "Read the full story"}</div>
+    <div class="cta-url">${escapeHtml(
+      source.kind === "arxiv" ? `arxiv.org/abs/${source.id}` : new URL(source.url).hostname,
+    )}</div>
   </div>
 </div>`;
   }
@@ -108,21 +112,26 @@ function computeBeatDurations(beats: Beat[], total: number): number[] {
 }
 
 export function buildComposition(opts: {
-  paper: ArxivPaper;
+  source: Source;
   brief: Brief;
   narratorUrl: string;
   durationSeconds: number;
   animations?: Record<number, Animation>; // indexed by beat order
 }): string {
-  const { paper, brief, narratorUrl, durationSeconds, animations = {} } = opts;
+  const { source, brief, narratorUrl, durationSeconds, animations = {} } = opts;
+  // Keep the old name internally so the existing chyron template reads.
+  const paper = source;
   const total = Math.max(durationSeconds, 30);
   const beats = [...brief.beats].sort((a, b) => a.at - b.at);
   const durs = computeBeatDurations(beats, total);
 
   const beatsHtml = beats
-    .map((b, i) => beatHtml(b, paper, i, durs[i], animations[i]))
+    .map((b, i) => beatHtml(b, source, i, durs[i], animations[i]))
     .filter(Boolean)
     .join("\n");
+
+  const chyronTopLabel = sourceKindLabel(source);
+  const chyronMeta = sourceMetaLine(source);
 
   // For non-animation beats, generic entrance. Animation beats get their own
   // GSAP fragment (offset by beat.at) so their internal motion runs in sync.
@@ -245,8 +254,8 @@ export function buildComposition(opts: {
     <div id="chy" class="clip chyron" data-start="0" data-duration="${total}" data-track-index="1">
       <div class="chyron-mark"></div>
       <div class="chyron-paper">
-        <b>${escapeHtml(paper.title.slice(0, 100))}</b><br/>
-        ${escapeHtml(paper.authors.slice(0, 3).join(" · "))}${paper.authors.length > 3 ? " et al." : ""} · ${escapeHtml(paper.publishedAt.slice(0, 4))}
+        <b>${escapeHtml(source.title.slice(0, 100))}</b><br/>
+        ${escapeHtml((source.authors ?? []).slice(0, 3).join(" · "))}${(source.authors ?? []).length > 3 ? " et al." : ""}${chyronMeta ? " · " + escapeHtml(chyronMeta.replace(/^.*?· /, "")) : ""}
       </div>
     </div>
 

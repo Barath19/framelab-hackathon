@@ -1,4 +1,6 @@
 import { fetchArxivPaper } from "@/lib/tools/arxiv";
+import { fetchNewsArticle } from "@/lib/tools/news";
+import { detectKind, type Source } from "@/lib/tools/source";
 import { generateBrief } from "@/lib/tools/brief";
 import { animateBeat, type Animation } from "@/lib/tools/animator";
 import { mockNarration, pollNarration, startNarration } from "@/lib/tools/narrator";
@@ -13,7 +15,6 @@ import {
   saveComposition,
 } from "@/lib/store";
 import { renderComposition } from "@/lib/tools/render";
-import type { ArxivPaper } from "@/lib/tools/arxiv";
 import type { Brief } from "@/lib/tools/brief";
 
 export const runtime = "nodejs";
@@ -22,7 +23,7 @@ export const maxDuration = 800;
 type Event =
   | { type: "log"; ts: string; tag: string; text: string }
   | { type: "progress"; percent: number; stage: string }
-  | { type: "paper"; paper: ArxivPaper }
+  | { type: "paper"; paper: Source }
   | { type: "brief"; brief: Brief }
   | { type: "narrator"; videoUrl: string; durationSeconds: number }
   | { type: "composition"; id: string; previewUrl: string }
@@ -58,7 +59,7 @@ export async function POST(req: Request) {
         send({ type: "progress", percent: Math.max(0, Math.min(100, Math.round(percent))), stage });
 
       try {
-        let paper: ArxivPaper;
+        let paper: Source;
         let brief: Brief;
         let videoId: string;
         let mockClip:
@@ -92,7 +93,7 @@ export async function POST(req: Request) {
             progress(BANDS.compose.start, BANDS.compose.label);
             const localUrl = `/api/videos/${videoId}`;
             const html = buildComposition({
-              paper,
+              source: paper,
               brief,
               narratorUrl: localUrl,
               durationSeconds: cached.durationSeconds || 20,
@@ -135,15 +136,20 @@ export async function POST(req: Request) {
           }
         } else {
           // ===== FULL RUN =====
+          const kind = detectKind(body.url!);
           progress(BANDS.fetch.start, BANDS.fetch.label);
-          log("FETCH", `Resolving ${body.url}…`);
-          paper = await fetchArxivPaper(body.url!);
+          log("FETCH", `Resolving ${body.url} (${kind})…`);
+          paper =
+            kind === "arxiv"
+              ? await fetchArxivPaper(body.url!)
+              : await fetchNewsArticle(body.url!);
           progress(BANDS.fetch.end, BANDS.fetch.label);
           log(
-            "PAPER",
-            `${paper.title.slice(0, 80)}${paper.title.length > 80 ? "…" : ""} — ${paper.authors.slice(0, 2).join(", ")}${paper.authors.length > 2 ? " et al." : ""}`,
+            kind === "arxiv" ? "PAPER" : "ARTICLE",
+            `${paper.title.slice(0, 80)}${paper.title.length > 80 ? "…" : ""} — ${(paper.authors ?? []).slice(0, 2).join(", ") || (paper.kind === "news" ? paper.source : "")}${(paper.authors ?? []).length > 2 ? " et al." : ""}`,
           );
-          log("FIGURES", `${paper.figures.length} figure${paper.figures.length === 1 ? "" : "s"} extracted.`);
+          const figCount = paper.kind === "arxiv" ? paper.figures.length : paper.figures.length;
+          log("FIGURES", `${figCount} figure${figCount === 1 ? "" : "s"} extracted.`);
           send({ type: "paper", paper });
 
           progress(BANDS.reading.start, BANDS.reading.label);
@@ -171,7 +177,7 @@ export async function POST(req: Request) {
               animBeats.map(async ({ b, i }) => {
                 if (b.show.type !== "animation") return null;
                 const anim = await animateBeat({
-                  paper,
+                  source: paper,
                   beatId: `b${i}`,
                   intent: b.show.intent,
                   durationSeconds: durs[i],
@@ -288,7 +294,7 @@ export async function POST(req: Request) {
         progress(BANDS.compose.start, BANDS.compose.label);
         log("COMPOSE", "Hyperframes composition: chyron + PIP + per-beat animations…");
         const html = buildComposition({
-          paper,
+          source: paper,
           brief,
           narratorUrl: localNarrator,
           durationSeconds: clip.durationSeconds,

@@ -1,5 +1,6 @@
 import { openai } from "../openai";
-import type { ArxivPaper } from "./arxiv";
+import type { Source } from "./source";
+import { sourceBody } from "./source";
 
 export type Beat = {
   at: number; // seconds into the narration
@@ -14,28 +15,30 @@ export type Beat = {
 
 export type Brief = {
   hook: string; // 1-sentence opener
-  script: string; // full ~75s narration
+  script: string; // full ~20s narration
   beats: Beat[];
 };
 
-const SYSTEM = `You are an AI science communicator. You have just read a research paper.
-Your job: write a punchy 20-second video narration that explains the paper to a smart non-expert,
-plus a parallel list of "beats" directing what should appear on screen at each moment.
+const SYSTEM = `You write a 20-second video narration plus a parallel list of
+"beats" — visual moments timed against the narration. The source is either a
+research paper (arXiv) or a news article. Tone follows the source:
+  - arXiv → an AI science communicator explaining the paper.
+  - news → a news anchor / explainer host summarizing the story.
 
 Rules:
-- The script must sound natural spoken aloud. Around 55-65 words total.
+- The script must sound natural spoken aloud. 55-65 words total.
 - Open with a one-sentence hook.
-- Cover: the problem, the idea, why it matters. Skip the evidence — there's no time.
-- End with a half-second "read the full paper" CTA line.
+- For arXiv: cover problem → idea → why it matters.
+- For news: cover what happened → why → what's next.
+- End with a half-second CTA ("read the full paper" / "read the full story").
 - Use 3-4 beats total spanning 0..20s. Pace: ~5-7s per beat.
-- 'figure' beats reference figure indexes from the paper's figures array.
+- 'figure' beats reference figure indexes from the source's figures array.
 - 'equation' beats use plain LaTeX (no $$ markers).
-- 'animation' beats describe what to visualize ("the encoder/decoder split",
-  "scaled dot-product attention", "token weights as lines between words",
-  "the reward objective vs the supervised objective"). PREFER animation
-  beats over figure beats when the concept is visual but not just a chart —
-  a downstream Animator agent will generate the actual SVG/GSAP.
-- Always start with { at: 0, show: { type: 'title' } } and end with { type: 'cta' } around 17s.
+- 'animation' beats describe what to visualize in plain English. PREFER
+  animation beats over figure beats when the concept is conceptual
+  rather than chart-shaped — a downstream Animator agent generates SVG.
+- Always start with { at: 0, show: { type: 'title' } } and end with
+  { type: 'cta' } around 17s.
 
 Return ONLY JSON. No prose, no markdown.
 
@@ -46,17 +49,24 @@ Schema:
   "beats": [{ "at": number, "show": { "type": "title" } | { "type": "figure", "index": number, "caption"?: string } | { "type": "equation", "latex": string } | { "type": "quote", "text": string } | { "type": "cta" } | { "type": "animation", "intent": string } }]
 }`;
 
-export async function generateBrief(paper: ArxivPaper): Promise<Brief> {
-  const figureList = paper.figures
+export async function generateBrief(source: Source): Promise<Brief> {
+  const kindLabel =
+    source.kind === "arxiv" ? "arXiv paper" : "news article";
+  const figureList = (source.kind === "arxiv" ? source.figures : source.figures)
     .map((f, i) => `  [${i}] ${f.caption || "(no caption)"}`)
     .join("\n");
-  const userMsg = `Paper:
-Title: ${paper.title}
-Authors: ${paper.authors.join(", ")}
-Published: ${paper.publishedAt}
 
-Abstract:
-${paper.abstract}
+  const meta =
+    source.kind === "arxiv"
+      ? `Authors: ${source.authors.join(", ")}\nPublished: ${source.publishedAt}`
+      : `Byline: ${source.authors.join(", ") || "—"}\nPublication: ${source.source || "—"}\nPublished: ${source.publishedAt}`;
+
+  const userMsg = `Source kind: ${kindLabel}
+Title: ${source.title}
+${meta}
+
+Body:
+${sourceBody(source).slice(0, 5000)}
 
 Figures available (you may reference by index):
 ${figureList || "  (none — work from text)"}
