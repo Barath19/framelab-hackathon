@@ -1,0 +1,26 @@
+# Xcode
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+
+# Swift / SPM
+.swiftpm/
+.build/
+Packages/
+Package.resolved
+
+# macOS
+.DS_Store
+
+# Editors
+.vscode/
+.idea/
+
+# Local secrets (just in case)
+*.env
+.env*
+secrets.*

@@ -43,3 +43,13 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Subprojects
+morning-demo/node_modules/
+morning-demo/renders/
+morning-demo/.narrator.json
+morning-demo/.env*
+macos/build/
+macos/DerivedData/
+macos/**/xcuserdata/
+macos/**/*.xcuserstate
