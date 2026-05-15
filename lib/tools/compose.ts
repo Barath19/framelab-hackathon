@@ -403,7 +403,7 @@ export function buildComposition(opts: {
     .chyron-paper b { color: #ffffff; font-weight: 700; }
     .chyron-time {
       margin-left: auto;
-      font-family: ui-monospace, "SF Mono", monospace;
+      font-family: "JetBrains Mono", ui-monospace, monospace;
       font-size: 22px;
       letter-spacing: 0.04em;
       color: var(--ink-soft);
@@ -535,7 +535,7 @@ export function buildComposition(opts: {
       bottom: 24px; left: 40px;
       z-index: 31;
       display: flex; align-items: center; gap: 12px;
-      font-family: ui-monospace, "SF Mono", monospace;
+      font-family: "JetBrains Mono", ui-monospace, monospace;
       font-size: 14px;
       color: var(--ink-soft);
     }
