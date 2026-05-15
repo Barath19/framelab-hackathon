@@ -8,7 +8,8 @@ export type Beat = {
     | { type: "figure"; index: number; caption?: string }
     | { type: "equation"; latex: string }
     | { type: "quote"; text: string }
-    | { type: "cta" };
+    | { type: "cta" }
+    | { type: "animation"; intent: string }; // explained by the Animator agent
 };
 
 export type Brief = {
@@ -29,6 +30,11 @@ Rules:
 - Use 3-4 beats total spanning 0..20s. Pace: ~5-7s per beat.
 - 'figure' beats reference figure indexes from the paper's figures array.
 - 'equation' beats use plain LaTeX (no $$ markers).
+- 'animation' beats describe what to visualize ("the encoder/decoder split",
+  "scaled dot-product attention", "token weights as lines between words",
+  "the reward objective vs the supervised objective"). PREFER animation
+  beats over figure beats when the concept is visual but not just a chart —
+  a downstream Animator agent will generate the actual SVG/GSAP.
 - Always start with { at: 0, show: { type: 'title' } } and end with { type: 'cta' } around 17s.
 
 Return ONLY JSON. No prose, no markdown.
@@ -37,7 +43,7 @@ Schema:
 {
   "hook": string,
   "script": string,
-  "beats": [{ "at": number, "show": { "type": "title" } | { "type": "figure", "index": number, "caption"?: string } | { "type": "equation", "latex": string } | { "type": "quote", "text": string } | { "type": "cta" } }]
+  "beats": [{ "at": number, "show": { "type": "title" } | { "type": "figure", "index": number, "caption"?: string } | { "type": "equation", "latex": string } | { "type": "quote", "text": string } | { "type": "cta" } | { "type": "animation", "intent": string } }]
 }`;
 
 export async function generateBrief(paper: ArxivPaper): Promise<Brief> {

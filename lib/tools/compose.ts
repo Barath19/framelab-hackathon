@@ -15,6 +15,7 @@
 
 import type { Beat, Brief } from "./brief";
 import type { ArxivPaper } from "./arxiv";
+import type { Animation } from "./animator";
 
 const escapeHtml = (s: string) =>
   s
@@ -24,11 +25,31 @@ const escapeHtml = (s: string) =>
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 
-function beatHtml(b: Beat, paper: ArxivPaper, index: number, durSec: number) {
+function beatHtml(
+  b: Beat,
+  paper: ArxivPaper,
+  index: number,
+  durSec: number,
+  animation?: Animation,
+) {
   const id = `b${index}`;
   const common = `id="${id}" class="clip beat" data-start="${b.at}" data-duration="${durSec}" data-track-index="2"`;
 
   switch (b.show.type) {
+    case "animation":
+      if (!animation || !animation.html) {
+        // Fall back to a quote-style card if the animator didn't deliver.
+        return `
+<div ${common}>
+  <div class="quote-card">
+    <div class="quote-text">${escapeHtml(b.show.intent)}</div>
+  </div>
+</div>`;
+      }
+      return `
+<div ${common}>
+  <div class="anim-card" id="${id}-canvas">${animation.html}</div>
+</div>`;
     case "title":
       return `
 <div ${common}>
@@ -91,23 +112,39 @@ export function buildComposition(opts: {
   brief: Brief;
   narratorUrl: string;
   durationSeconds: number;
+  animations?: Record<number, Animation>; // indexed by beat order
 }): string {
-  const { paper, brief, narratorUrl, durationSeconds } = opts;
+  const { paper, brief, narratorUrl, durationSeconds, animations = {} } = opts;
   const total = Math.max(durationSeconds, 30);
   const beats = [...brief.beats].sort((a, b) => a.at - b.at);
   const durs = computeBeatDurations(beats, total);
 
   const beatsHtml = beats
-    .map((b, i) => beatHtml(b, paper, i, durs[i]))
+    .map((b, i) => beatHtml(b, paper, i, durs[i], animations[i]))
     .filter(Boolean)
     .join("\n");
 
-  // GSAP entrance animation per beat (from below).
+  // For non-animation beats, generic entrance. Animation beats get their own
+  // GSAP fragment (offset by beat.at) so their internal motion runs in sync.
   const beatsGsap = beats
-    .map(
-      (_, i) =>
-        `tl.fromTo("#b${i} > div", { y: 60, opacity: 0 }, { y: 0, opacity: 1, duration: 0.6, ease: "power3.out" }, ${beats[i].at})`,
-    )
+    .map((b, i) => {
+      const at = b.at;
+      const enter = `tl.fromTo("#b${i} > div", { y: 60, opacity: 0 }, { y: 0, opacity: 1, duration: 0.6, ease: "power3.out" }, ${at})`;
+      if (b.show.type !== "animation") return enter;
+      const anim = animations[i];
+      if (!anim || !anim.gsap) return enter;
+      // Wrap the animator's body in an IIFE that exposes `tl` and offsets each
+      // .from/.to/.set call's position by `at`. Easier: post-process the
+      // string to inject the offset into the position argument.
+      // Inline rewrite: tl.from(... , <pos>) → tl.from(... , <pos> + at).
+      const body = anim.gsap
+        .replace(/tl\.(from|to|fromTo|set)\s*\(([\s\S]*?),\s*([^)]*?)\)\s*;?/g, (_m, fn, args, pos) => {
+          const trimmedPos = pos.trim();
+          const offset = trimmedPos === "" ? `${at}` : `(${trimmedPos}) + ${at}`;
+          return `tl.${fn}(${args}, ${offset});`;
+        });
+      return `${enter}\n      ${body}`;
+    })
     .join("\n      ");
 
   return `<!doctype html>
@@ -184,6 +221,11 @@ export function buildComposition(opts: {
     .cta-card { text-align: center; }
     .cta-eyebrow { font-size: 28px; letter-spacing: 0.18em; color: #c8c2b6; text-transform: uppercase; margin-bottom: 28px; }
     .cta-url { font-size: 88px; font-weight: 800; color: #e63946; }
+
+    .anim-card { width: 100%; max-width: 1500px; max-height: 820px; display: flex; align-items: center; justify-content: center; }
+    .anim-card svg { width: 100%; height: auto; max-height: 720px; }
+    .anim-card text { fill: #f5efe5; }
+    .anim-card .anim-el { opacity: 1; }
   </style>
 </head>
 <body>

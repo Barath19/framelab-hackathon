@@ -1,6 +1,7 @@
 import { fetchArxivPaper } from "@/lib/tools/arxiv";
 import { generateBrief } from "@/lib/tools/brief";
-import { pollNarration, startNarration } from "@/lib/tools/narrator";
+import { animateBeat, type Animation } from "@/lib/tools/animator";
+import { mockNarration, pollNarration, startNarration } from "@/lib/tools/narrator";
 import { buildComposition } from "@/lib/tools/compose";
 import {
   downloadAsset,
@@ -60,6 +61,10 @@ export async function POST(req: Request) {
         let paper: ArxivPaper;
         let brief: Brief;
         let videoId: string;
+        let mockClip:
+          | { videoId: string; videoUrl: string; thumbnailUrl?: string; durationSeconds: number }
+          | undefined;
+        const animations: Record<number, Animation> = {};
 
         if (body.videoId) {
           // ===== RESUME MODE =====
@@ -91,6 +96,7 @@ export async function POST(req: Request) {
               brief,
               narratorUrl: localUrl,
               durationSeconds: cached.durationSeconds || 20,
+              animations,
             });
             saveComposition(
               { ...cached, narratorUrl: localUrl, pending: false },
@@ -151,6 +157,38 @@ export async function POST(req: Request) {
           progress(BANDS.reading.end, BANDS.reading.label);
           send({ type: "brief", brief });
 
+          // ===== ANIMATE: generate inline SVG explainers per animation beat =====
+          const animBeats = brief.beats
+            .map((b, i) => ({ b, i }))
+            .filter(({ b }) => b.show.type === "animation");
+          if (animBeats.length > 0) {
+            log("ANIMATE", `Generating ${animBeats.length} animation${animBeats.length === 1 ? "" : "s"} for the visual beats…`);
+            const total = 20;
+            const durs = brief.beats.map((b, i) =>
+              Math.max(1, (brief.beats[i + 1]?.at ?? total) - b.at),
+            );
+            const results = await Promise.allSettled(
+              animBeats.map(async ({ b, i }) => {
+                if (b.show.type !== "animation") return null;
+                const anim = await animateBeat({
+                  paper,
+                  beatId: `b${i}`,
+                  intent: b.show.intent,
+                  durationSeconds: durs[i],
+                });
+                return { i, anim };
+              }),
+            );
+            for (const r of results) {
+              if (r.status === "fulfilled" && r.value) {
+                animations[r.value.i] = r.value.anim;
+                log("ANIMATE", `beat ${r.value.i}: ${r.value.anim.html.length} bytes of SVG, ${r.value.anim.gsap.length} bytes of GSAP.`);
+              } else if (r.status === "rejected") {
+                log("ANIMATE", `failed: ${r.reason instanceof Error ? r.reason.message : String(r.reason)}`);
+              }
+            }
+          }
+
           // Clamp script for the ~20s budget.
           const MAX_CHARS = 420;
           const script =
@@ -161,10 +199,20 @@ export async function POST(req: Request) {
             log("CLAMP", `Trimmed script ${brief.script.length} → ${script.length} chars.`);
           }
 
-          log("HEYGEN", `Submitting ${script.length}-char narration to HeyGen…`);
-          const started = await startNarration(script);
-          videoId = started.videoId;
-          log("HEYGEN", `video_id=${videoId} — polling…`);
+          const isMock = process.env.MOCK_HEYGEN === "1";
+          if (isMock) {
+            // Generate the mock clip exactly once; we'll skip pollNarration below.
+            const mock = mockNarration(paper.id);
+            videoId = mock.videoId;
+            // Stash so the converge-step finds a "ready" mock without re-fetching.
+            mockClip = mock;
+            log("HEYGEN", `MOCK_HEYGEN=1 — reusing cached clip → ${videoId}.`);
+          } else {
+            log("HEYGEN", `Submitting ${script.length}-char narration to HeyGen…`);
+            const started = await startNarration(script);
+            videoId = started.videoId;
+            log("HEYGEN", `video_id=${videoId} — polling…`);
+          }
 
           // Stash a pending record IMMEDIATELY so we can resume on timeout.
           saveComposition(
@@ -183,38 +231,46 @@ export async function POST(req: Request) {
 
         // ===== Both modes converge here: poll → compose =====
         progress(BANDS.heygen.start, BANDS.heygen.label);
-        // Tuned to observed runtimes for our talking-head avatar (~90-120s
-        // wall time). Asymptote ensures the bar never lies past ~93% while
-        // HeyGen is still working.
-        const EXPECTED_HEYGEN_SECS = 100;
-        const clip = await pollNarration(videoId, {
-          onStatus: (s) => log("HEYGEN", `status: ${s}`),
-          onTick: (elapsed) => {
-            log("HEYGEN", `still rendering… ${elapsed}s elapsed`);
-            // Asymptote within the heygen band — never quite hit 95 until done.
-            const frac = 1 - Math.exp(-elapsed / EXPECTED_HEYGEN_SECS);
-            const pct =
-              BANDS.heygen.start + frac * (BANDS.heygen.end - BANDS.heygen.start - 2);
-            progress(pct, BANDS.heygen.label);
-          },
-        });
+        const isMock = process.env.MOCK_HEYGEN === "1";
+        let clip;
+        if (mockClip) {
+          clip = mockClip;
+          log("HEYGEN", `MOCK clip ready (${clip.durationSeconds}s).`);
+        } else if (isMock) {
+          // Resume + MOCK_HEYGEN: synthesize once now.
+          clip = mockNarration(paper.id);
+          videoId = clip.videoId;
+          log("HEYGEN", `MOCK clip ready (${clip.durationSeconds}s).`);
+        } else {
+          const EXPECTED_HEYGEN_SECS = 100;
+          clip = await pollNarration(videoId, {
+            onStatus: (s) => log("HEYGEN", `status: ${s}`),
+            onTick: (elapsed) => {
+              log("HEYGEN", `still rendering… ${elapsed}s elapsed`);
+              const frac = 1 - Math.exp(-elapsed / EXPECTED_HEYGEN_SECS);
+              const pct =
+                BANDS.heygen.start + frac * (BANDS.heygen.end - BANDS.heygen.start - 2);
+              progress(pct, BANDS.heygen.label);
+            },
+          });
+        }
         progress(BANDS.heygen.end, BANDS.heygen.label);
 
-        // ===== DOWNLOAD TO LOCAL =====
-        // HeyGen returns a signed S3 URL that expires within 24h. Pull the
-        // bytes down now so demos and the channel page keep working forever.
-        log("LOCAL", "Downloading narrator MP4 + thumbnail to local cache…");
-        try {
-          await downloadAsset(clip.videoUrl, localVideoPath(videoId));
-          if (clip.thumbnailUrl) {
-            await downloadAsset(clip.thumbnailUrl, localThumbPath(videoId));
+        // ===== DOWNLOAD TO LOCAL (skip if mocking — already copied) =====
+        if (!isMock) {
+          log("LOCAL", "Downloading narrator MP4 + thumbnail to local cache…");
+          try {
+            await downloadAsset(clip.videoUrl, localVideoPath(videoId));
+            if (clip.thumbnailUrl) {
+              await downloadAsset(clip.thumbnailUrl, localThumbPath(videoId));
+            }
+            log("LOCAL", "Cached. Composition will reference /api/videos/<id>.");
+          } catch (err) {
+            log(
+              "LOCAL",
+              `download failed: ${err instanceof Error ? err.message : String(err)} — falling back to signed URL.`,
+            );
           }
-          log("LOCAL", "Cached. Composition will reference /api/videos/<id>.");
-        } catch (err) {
-          log(
-            "LOCAL",
-            `download failed: ${err instanceof Error ? err.message : String(err)} — falling back to signed URL.`,
-          );
         }
 
         const localNarrator = hasLocalVideo(videoId)
@@ -230,12 +286,13 @@ export async function POST(req: Request) {
         send({ type: "narrator", videoUrl: localNarrator, durationSeconds: clip.durationSeconds });
 
         progress(BANDS.compose.start, BANDS.compose.label);
-        log("COMPOSE", "Hyperframes composition: chyron + PIP + per-beat figures/equations…");
+        log("COMPOSE", "Hyperframes composition: chyron + PIP + per-beat animations…");
         const html = buildComposition({
           paper,
           brief,
           narratorUrl: localNarrator,
           durationSeconds: clip.durationSeconds,
+          animations,
         });
 
         saveComposition(

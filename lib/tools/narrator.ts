@@ -11,6 +11,54 @@
 const AVATAR_ID = "Adriana_BizTalk_Front_public";
 const VOICE_ID = "f8c69e517f424cafaecde32dde57096b"; // Allison — English, female
 
+/**
+ * Reuses one of the MP4s we've already cached locally so the Hyperframes
+ * pipeline can iterate fast without the 60-90s HeyGen wait. We generate a
+ * fresh composition id and *copy* the cached MP4 to the new id — that way
+ * every downstream step (download, local serve, composed render) works
+ * identically to a real HeyGen run.
+ */
+export function mockNarration(seedId: string): NarratorClip {
+  const fs = require("node:fs") as typeof import("node:fs");
+  const path = require("node:path") as typeof import("node:path");
+  const crypto = require("node:crypto") as typeof import("node:crypto");
+  const dir = path.resolve(process.cwd(), ".data/videos");
+  const files = fs.existsSync(dir)
+    ? fs.readdirSync(dir).filter((f) => f.endsWith(".mp4"))
+    : [];
+  if (!files.length) {
+    throw new Error(
+      "MOCK_HEYGEN=1 but no cached MP4s in .data/videos/. Run a real HeyGen pass once first.",
+    );
+  }
+  // Deterministically pick the same source for a given seed.
+  let h = 0;
+  for (let i = 0; i < seedId.length; i++) h = (h * 31 + seedId.charCodeAt(i)) | 0;
+  const pick = files[Math.abs(h) % files.length];
+
+  // Fresh comp id so the channel can list multiple papers each with the same
+  // mock voice — the *composition* differs even when the audio doesn't.
+  const newId = `mock-${crypto.randomBytes(8).toString("hex")}`;
+  const src = path.join(dir, pick);
+  const dst = path.join(dir, `${newId}.mp4`);
+  fs.copyFileSync(src, dst);
+
+  // Copy thumbnail too if present.
+  const thumbDir = path.resolve(process.cwd(), ".data/thumbnails");
+  const thumbSrc = path.join(thumbDir, `${pick.replace(/\.mp4$/, "")}.jpg`);
+  if (fs.existsSync(thumbSrc)) {
+    if (!fs.existsSync(thumbDir)) fs.mkdirSync(thumbDir, { recursive: true });
+    fs.copyFileSync(thumbSrc, path.join(thumbDir, `${newId}.jpg`));
+  }
+
+  return {
+    videoId: newId,
+    videoUrl: `/api/videos/${newId}`,
+    thumbnailUrl: `/api/thumbs/${newId}`,
+    durationSeconds: 20,
+  };
+}
+
 export type NarratorClip = {
   videoId: string;
   videoUrl: string;
