@@ -112,14 +112,6 @@ To enable Slack delivery:
               #northstarmetrics  ✓
 ```
 
-## Tracks
-
-Submitting to the HeyGen Hackathon **Product** track.
-
-The composition is deterministic (no `Math.random`, no `Date.now`) so
-every render of the same data produces the same video — making this
-safe to run unattended every morning.
-
 ## Built at
 
 HeyGen Hackathon · San Francisco · May 14–15, 2026
