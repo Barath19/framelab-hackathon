@@ -55,13 +55,23 @@ export async function startNarration(
 
 export async function pollNarration(
   videoId: string,
-  onStatus?: (s: string) => void,
+  callbacks?: {
+    onStatus?: (s: string) => void;
+    onTick?: (elapsed: number) => void;
+  },
 ): Promise<NarratorClip> {
   const key = process.env.HEYGEN_API_KEY!;
   const start = Date.now();
   let last = "";
+  let lastTickAt = 0;
   while (true) {
     await new Promise((r) => setTimeout(r, 4000));
+    const elapsed = Math.floor((Date.now() - start) / 1000);
+    // Tick every ~10s so the SSE stream stays warm and the user sees progress.
+    if (elapsed - lastTickAt >= 10) {
+      lastTickAt = elapsed;
+      callbacks?.onTick?.(elapsed);
+    }
     const r = await fetch(
       `https://api.heygen.com/v1/video_status.get?video_id=${videoId}`,
       { headers: { "X-Api-Key": key } },
@@ -70,7 +80,7 @@ export async function pollNarration(
     const status = j?.data?.status as string | undefined;
     if (status && status !== last) {
       last = status;
-      onStatus?.(status);
+      callbacks?.onStatus?.(status);
     }
     if (status === "completed") {
       return {

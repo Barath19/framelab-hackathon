@@ -52,12 +52,24 @@ export async function POST(req: Request) {
         );
         send({ type: "brief", brief });
 
-        log("HEYGEN", "Submitting narration to HeyGen (avatar: Abigail, voice: Allison)…");
-        const { videoId } = await startNarration(brief.script);
-        log("HEYGEN", `video_id=${videoId} — polling status…`);
-        const clip = await pollNarration(videoId, (s) =>
-          log("HEYGEN", `status: ${s}`),
-        );
+        // Clamp script defensively — HeyGen will refuse / produce overlong
+        // clips if the LLM ignored the 75s budget.
+        const MAX_CHARS = 1400;
+        const script =
+          brief.script.length > MAX_CHARS
+            ? brief.script.slice(0, MAX_CHARS).replace(/\S*$/, "").trim() + "…"
+            : brief.script;
+        if (script.length < brief.script.length) {
+          log("CLAMP", `Trimmed script ${brief.script.length} → ${script.length} chars to keep clip under ~100s.`);
+        }
+
+        log("HEYGEN", `Submitting ${script.length}-char narration to HeyGen…`);
+        const { videoId } = await startNarration(script);
+        log("HEYGEN", `video_id=${videoId} — polling…`);
+        const clip = await pollNarration(videoId, {
+          onStatus: (s) => log("HEYGEN", `status: ${s}`),
+          onTick: (elapsed) => log("HEYGEN", `still rendering… ${elapsed}s elapsed`),
+        });
         log(
           "HEYGEN",
           `ready — ${clip.durationSeconds.toFixed(1)}s narrator clip.`,
