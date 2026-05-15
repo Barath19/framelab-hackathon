@@ -68,6 +68,22 @@ PATTERNS YOU CAN USE
 - side-by-side: two diagrams with a vs. between them.
 - callout: one big number/word ramping in, label underneath.
 
+CODE / ARCHITECTURE PATTERNS (for repo sources)
+- file-tree: lines of monospace text with file/folder icons appearing
+  one row at a time. Treat dirs as 📁 (or rect+label), files as 📄.
+- module-graph: rounded rect modules connected by arrows showing imports
+  or call directions; light up an active path while others dim.
+- request-flow: a small token (pulsing circle) travels along an arrow
+  path through 3-5 labeled stages (Request → Router → Handler →
+  Database → Response).
+- code-type-on: a monospace block where lines reveal character-by-character
+  (use stagger across many <tspan> elements). Use real method/identifier
+  names from the entry point when relevant.
+- stack-build: layers of a stack stacking from bottom (e.g. UI / API /
+  Engine / Storage), each labeled, snapping into place.
+- pipeline: source on the left, sink on the right, three or four
+  transform stages in between with data dots flowing through.
+
 DON'T
 - Do not include <html>/<head>/<body>.
 - Do not import GSAP — it's already loaded.
@@ -81,12 +97,27 @@ export async function animateBeat(opts: {
   durationSeconds: number;
 }): Promise<Animation> {
   const { source, beatId, intent, durationSeconds } = opts;
-  const sourceLine =
-    source.kind === "arxiv"
-      ? `Paper: "${source.title}" (${source.id})`
-      : `Article: "${source.title}" — ${source.source || "(source)"}`;
-  const userMsg = `${sourceLine}
-${source.kind === "arxiv" ? "Abstract" : "Lede"}: ${sourceBody(source).slice(0, 800)}
+
+  let sourceBlock: string;
+  if (source.kind === "arxiv") {
+    sourceBlock = `Paper: "${source.title}" (${source.id})
+Abstract: ${sourceBody(source).slice(0, 800)}`;
+  } else if (source.kind === "news") {
+    sourceBlock = `Article: "${source.title}" — ${source.source || "(source)"}
+Lede: ${sourceBody(source).slice(0, 800)}`;
+  } else {
+    const treeSample = source.tree
+      .slice(0, 16)
+      .map((n) => `${n.type === "dir" ? "[dir]" : "[file]"} ${n.path}`)
+      .join("\n");
+    sourceBlock = `Repo: "${source.title}" (${source.language || "?"}, ★${source.stars})
+Description: ${source.abstract.slice(0, 500)}
+Entry point: ${source.entry || "(unknown)"}
+Top-level tree:
+${treeSample}`;
+  }
+
+  const userMsg = `${sourceBlock}
 
 Beat id: ${beatId}    (use #${beatId}-... for every element id)
 Duration budget: ~${durationSeconds.toFixed(1)}s

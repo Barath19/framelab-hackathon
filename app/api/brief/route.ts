@@ -1,5 +1,6 @@
 import { fetchArxivPaper } from "@/lib/tools/arxiv";
 import { fetchNewsArticle } from "@/lib/tools/news";
+import { fetchRepo } from "@/lib/tools/repo";
 import { detectKind, type Source } from "@/lib/tools/source";
 import { generateBrief } from "@/lib/tools/brief";
 import { animateBeat, type Animation } from "@/lib/tools/animator";
@@ -142,14 +143,25 @@ export async function POST(req: Request) {
           paper =
             kind === "arxiv"
               ? await fetchArxivPaper(body.url!)
+              : kind === "repo"
+              ? await fetchRepo(body.url!)
               : await fetchNewsArticle(body.url!);
           progress(BANDS.fetch.end, BANDS.fetch.label);
+
+          const fetchTag =
+            kind === "arxiv" ? "PAPER" : kind === "repo" ? "REPO" : "ARTICLE";
+          const byline =
+            (paper.authors ?? []).slice(0, 2).join(", ") ||
+            (paper.kind === "news" ? paper.source : "") ||
+            (paper.kind === "repo" ? `★ ${paper.stars.toLocaleString()}` : "");
           log(
-            kind === "arxiv" ? "PAPER" : "ARTICLE",
-            `${paper.title.slice(0, 80)}${paper.title.length > 80 ? "…" : ""} — ${(paper.authors ?? []).slice(0, 2).join(", ") || (paper.kind === "news" ? paper.source : "")}${(paper.authors ?? []).length > 2 ? " et al." : ""}`,
+            fetchTag,
+            `${paper.title.slice(0, 80)}${paper.title.length > 80 ? "…" : ""} — ${byline}`,
           );
-          const figCount = paper.kind === "arxiv" ? paper.figures.length : paper.figures.length;
-          log("FIGURES", `${figCount} figure${figCount === 1 ? "" : "s"} extracted.`);
+          if (paper.kind === "repo") {
+            log("TREE", `${paper.tree.length} top-level entries · language: ${paper.language || "?"} · entry: ${paper.entry || "(unknown)"}`);
+          }
+          log("FIGURES", `${paper.figures.length} figure${paper.figures.length === 1 ? "" : "s"} extracted.`);
           send({ type: "paper", paper });
 
           progress(BANDS.reading.start, BANDS.reading.label);

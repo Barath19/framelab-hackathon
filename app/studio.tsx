@@ -19,12 +19,13 @@ type BriefEvent =
   | { type: "done" }
   | { type: "error"; message: string };
 
-const EXAMPLES: { label: string; url: string; kind: "arxiv" | "news" }[] = [
+const EXAMPLES: { label: string; url: string; kind: "arxiv" | "news" | "repo" }[] = [
   { label: "📄 Attention Is All You Need", url: "https://arxiv.org/abs/1706.03762", kind: "arxiv" },
   { label: "📄 GPT-3 Few-Shot Learners", url: "https://arxiv.org/abs/2005.14165", kind: "arxiv" },
-  { label: "📰 BBC top story", url: "https://www.bbc.com/news", kind: "news" },
-  { label: "📰 Hacker News front page item", url: "https://news.ycombinator.com/news", kind: "news" },
-  { label: "📰 The Verge — latest", url: "https://www.theverge.com/", kind: "news" },
+  { label: "💻 vercel/next.js", url: "https://github.com/vercel/next.js", kind: "repo" },
+  { label: "💻 fastapi/fastapi", url: "https://github.com/fastapi/fastapi", kind: "repo" },
+  { label: "💻 ollama/ollama", url: "https://github.com/ollama/ollama", kind: "repo" },
+  { label: "📰 BBC News", url: "https://www.bbc.com/news", kind: "news" },
 ];
 
 type Stage =
@@ -195,14 +196,14 @@ export default function Studio() {
         <div className="px-8 pb-4">
           <Card className="p-5">
             <div className="font-pixel text-[10px] uppercase mb-3 opacity-80">
-              arXiv or news URL
+              arXiv / GitHub / news URL
             </div>
             <div className="flex gap-3">
               <input
                 type="url"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                placeholder="https://arxiv.org/abs/… or https://www.bbc.com/news/…"
+                placeholder="arxiv.org/abs/… · github.com/owner/repo · any article"
                 className="flex-1 bg-secondary/70 border-4 border-foreground px-4 py-3 text-lg font-mono outline-none"
                 onKeyDown={(e) => e.key === "Enter" && submit()}
                 disabled={running}

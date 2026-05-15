@@ -20,23 +20,29 @@ export type Brief = {
 };
 
 const SYSTEM = `You write a 20-second video narration plus a parallel list of
-"beats" — visual moments timed against the narration. The source is either a
-research paper (arXiv) or a news article. Tone follows the source:
+"beats" — visual moments timed against the narration. The source is an arXiv
+paper, a news article, or a GitHub code repository. Tone follows the source:
   - arXiv → an AI science communicator explaining the paper.
   - news → a news anchor / explainer host summarizing the story.
+  - repo → a developer-relations host explaining what the codebase does
+           and how it works architecturally.
 
 Rules:
 - The script must sound natural spoken aloud. 55-65 words total.
 - Open with a one-sentence hook.
 - For arXiv: cover problem → idea → why it matters.
 - For news: cover what happened → why → what's next.
-- End with a half-second CTA ("read the full paper" / "read the full story").
+- For repo: cover what it does → how it works (architecture) → why dev should care.
+- End with a half-second CTA ("read the full paper" / "read the full story" /
+  "star the repo").
 - Use 3-4 beats total spanning 0..20s. Pace: ~5-7s per beat.
 - 'figure' beats reference figure indexes from the source's figures array.
 - 'equation' beats use plain LaTeX (no $$ markers).
-- 'animation' beats describe what to visualize in plain English. PREFER
-  animation beats over figure beats when the concept is conceptual
-  rather than chart-shaped — a downstream Animator agent generates SVG.
+- 'animation' beats describe what to visualize in plain English. STRONGLY
+  PREFER animation beats for repos — code architecture is visual: file
+  trees sliding in, modules connected by arrows, data flowing through a
+  pipeline, a request traveling from entry point to handler. The
+  downstream Animator agent will generate SVG/GSAP.
 - Always start with { at: 0, show: { type: 'title' } } and end with
   { type: 'cta' } around 17s.
 
@@ -51,15 +57,34 @@ Schema:
 
 export async function generateBrief(source: Source): Promise<Brief> {
   const kindLabel =
-    source.kind === "arxiv" ? "arXiv paper" : "news article";
-  const figureList = (source.kind === "arxiv" ? source.figures : source.figures)
+    source.kind === "arxiv"
+      ? "arXiv paper"
+      : source.kind === "news"
+      ? "news article"
+      : "GitHub repository";
+
+  const figureList = source.figures
     .map((f, i) => `  [${i}] ${f.caption || "(no caption)"}`)
     .join("\n");
 
-  const meta =
-    source.kind === "arxiv"
-      ? `Authors: ${source.authors.join(", ")}\nPublished: ${source.publishedAt}`
-      : `Byline: ${source.authors.join(", ") || "—"}\nPublication: ${source.source || "—"}\nPublished: ${source.publishedAt}`;
+  let meta: string;
+  if (source.kind === "arxiv") {
+    meta = `Authors: ${source.authors.join(", ")}\nPublished: ${source.publishedAt}`;
+  } else if (source.kind === "news") {
+    meta = `Byline: ${source.authors.join(", ") || "—"}\nPublication: ${source.source || "—"}\nPublished: ${source.publishedAt}`;
+  } else {
+    const treeSample = source.tree
+      .slice(0, 14)
+      .map((n) => `${n.type === "dir" ? "📁" : "📄"} ${n.path}`)
+      .join("\n");
+    meta =
+      `Owner: ${source.authors[0]}\n` +
+      `Language: ${source.language || "?"}\n` +
+      `Stars: ${source.stars.toLocaleString()}\n` +
+      `Topics: ${source.topics.join(", ") || "—"}\n` +
+      `Entry point: ${source.entry || "(not detected)"}\n` +
+      `Top-level tree (first 14):\n${treeSample}`;
+  }
 
   const userMsg = `Source kind: ${kindLabel}
 Title: ${source.title}

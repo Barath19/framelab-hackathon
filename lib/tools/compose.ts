@@ -90,16 +90,27 @@ function beatHtml(
     <div class="quote-text">${escapeHtml(b.show.text)}</div>
   </div>
 </div>`;
-    case "cta":
+    case "cta": {
+      const eyebrow =
+        source.kind === "arxiv"
+          ? "Read the full paper"
+          : source.kind === "repo"
+          ? "Star the repo"
+          : "Read the full story";
+      const url =
+        source.kind === "arxiv"
+          ? `arxiv.org/abs/${source.id}`
+          : source.kind === "repo"
+          ? `github.com/${source.id}`
+          : new URL(source.url).hostname;
       return `
 <div ${common}>
   <div class="cta-card">
-    <div class="cta-eyebrow">${source.kind === "arxiv" ? "Read the full paper" : "Read the full story"}</div>
-    <div class="cta-url">${escapeHtml(
-      source.kind === "arxiv" ? `arxiv.org/abs/${source.id}` : new URL(source.url).hostname,
-    )}</div>
+    <div class="cta-eyebrow">${eyebrow}</div>
+    <div class="cta-url">${escapeHtml(url)}</div>
   </div>
 </div>`;
+    }
   }
 }
 
