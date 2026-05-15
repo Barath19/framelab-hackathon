@@ -126,7 +126,10 @@ export async function POST(req: Request) {
 
         // ===== Both modes converge here: poll → compose =====
         progress(BANDS.heygen.start, BANDS.heygen.label);
-        const EXPECTED_HEYGEN_SECS = 60;
+        // Tuned to observed runtimes for our talking-head avatar (~90-120s
+        // wall time). Asymptote ensures the bar never lies past ~93% while
+        // HeyGen is still working.
+        const EXPECTED_HEYGEN_SECS = 100;
         const clip = await pollNarration(videoId, {
           onStatus: (s) => log("HEYGEN", `status: ${s}`),
           onTick: (elapsed) => {
