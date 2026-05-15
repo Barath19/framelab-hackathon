@@ -44,6 +44,7 @@ const STAGE_LABEL: Record<Stage, string> = {
 
 export default function Studio() {
   const [url, setUrl] = useState("");
+  const [resumeId, setResumeId] = useState("");
   const [running, setRunning] = useState(false);
   const [stage, setStage] = useState<Stage>("idle");
   const [transcript, setTranscript] = useState<TranscriptLine[]>([]);
@@ -83,9 +84,10 @@ export default function Studio() {
   }, [transcript]);
 
   const submit = async () => {
-    if (!url.trim() || running) return;
+    const isResume = resumeId.trim().length > 0;
+    if ((!url.trim() && !isResume) || running) return;
     setRunning(true);
-    setStage("fetching");
+    setStage(isResume ? "heygen" : "fetching");
     setTranscript([]);
     setPreviewUrl(null);
     setNarratorUrl(null);
@@ -95,7 +97,9 @@ export default function Studio() {
       res = await fetch("/api/brief", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: url.trim() }),
+        body: JSON.stringify(
+          isResume ? { videoId: resumeId.trim() } : { url: url.trim() },
+        ),
       });
     } catch (err) {
       handleEvent({ type: "error", message: `Network error: ${(err as Error).message}` });
@@ -147,7 +151,13 @@ export default function Studio() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <a
+              href="/channel"
+              className="text-base opacity-80 hover:opacity-100 underline mr-3"
+            >
+              channel →
+            </a>
             <span className="font-pixel text-[10px] uppercase opacity-70 mr-2">
               Powered by
             </span>
@@ -194,6 +204,29 @@ export default function Studio() {
                 </button>
               ))}
             </div>
+
+            <details className="mt-4 text-sm">
+              <summary className="cursor-pointer opacity-70 hover:opacity-100">
+                or resume from a HeyGen video_id (timed out earlier?)
+              </summary>
+              <div className="mt-2 flex gap-2">
+                <input
+                  type="text"
+                  value={resumeId}
+                  onChange={(e) => setResumeId(e.target.value)}
+                  placeholder="e.g. 4370d880d95d4ea59b212a26c55b58fc"
+                  className="flex-1 bg-secondary/70 border-2 border-foreground px-3 py-2 font-mono text-sm outline-none"
+                  disabled={running}
+                />
+                <button
+                  onClick={submit}
+                  disabled={running || !resumeId.trim()}
+                  className="font-pixel text-[9px] uppercase px-3 py-2 border-2 border-foreground bg-secondary hover:bg-primary hover:text-white disabled:opacity-50"
+                >
+                  Resume
+                </button>
+              </div>
+            </details>
           </Card>
         </div>
 

@@ -6,7 +6,9 @@
  * working in scripts/test-heygen.mjs. Both are HeyGen's free public choices.
  */
 
-const AVATAR_ID = "Abigail_expressive_2024112501";
+// Picked for fast render: talking-head business style instead of full-body
+// expressive. The expressive class was queueing past 5 min on observed runs.
+const AVATAR_ID = "Adriana_BizTalk_Front_public";
 const VOICE_ID = "f8c69e517f424cafaecde32dde57096b"; // Allison — English, female
 
 export type NarratorClip = {
