@@ -5,7 +5,7 @@ import { detectKind, type Source } from "@/lib/tools/source";
 import { generateBrief } from "@/lib/tools/brief";
 import { animateBeat, type Animation } from "@/lib/tools/animator";
 import { mockNarration, pollNarration, startNarration } from "@/lib/tools/narrator";
-import { buildComposition } from "@/lib/tools/compose";
+import { buildComposition, lintComposition } from "@/lib/tools/compose";
 import {
   downloadAsset,
   getComposition,
@@ -100,6 +100,14 @@ export async function POST(req: Request) {
               durationSeconds: cached.durationSeconds || 20,
               animations,
             });
+            try {
+              const lint = lintComposition(html);
+              const errs = lint.findings.filter((f) => f.severity === "error");
+              log("LINT", `@hyperframes/core lint: ${lint.findings.length} finding${lint.findings.length === 1 ? "" : "s"} (${errs.length} error${errs.length === 1 ? "" : "s"}).`);
+              for (const f of errs.slice(0, 3)) log("LINT", `! ${f.code}: ${f.message}`);
+            } catch (e) {
+              log("LINT", `linter threw: ${e instanceof Error ? e.message : String(e)}`);
+            }
             saveComposition(
               { ...cached, narratorUrl: localUrl, pending: false },
               html,
@@ -312,6 +320,14 @@ export async function POST(req: Request) {
           durationSeconds: clip.durationSeconds,
           animations,
         });
+        try {
+          const lint = lintComposition(html);
+          const errs = lint.findings.filter((f) => f.severity === "error");
+          log("LINT", `@hyperframes/core lint: ${lint.findings.length} finding${lint.findings.length === 1 ? "" : "s"} (${errs.length} error${errs.length === 1 ? "" : "s"}).`);
+          for (const f of errs.slice(0, 3)) log("LINT", `! ${f.code}: ${f.message}`);
+        } catch (e) {
+          log("LINT", `linter threw: ${e instanceof Error ? e.message : String(e)}`);
+        }
 
         saveComposition(
           {
