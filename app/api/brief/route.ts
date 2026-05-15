@@ -7,7 +7,7 @@ import type { ArxivPaper } from "@/lib/tools/arxiv";
 import type { Brief } from "@/lib/tools/brief";
 
 export const runtime = "nodejs";
-export const maxDuration = 300;
+export const maxDuration = 800;
 
 type Event =
   | { type: "log"; ts: string; tag: string; text: string }

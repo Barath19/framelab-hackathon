@@ -93,8 +93,11 @@ export async function pollNarration(
     if (status === "failed") {
       throw new Error(`HeyGen failed: ${JSON.stringify(j)}`);
     }
-    if ((Date.now() - start) / 1000 > 300) {
-      throw new Error("HeyGen narration timed out after 5 minutes");
+    if ((Date.now() - start) / 1000 > 600) {
+      throw new Error(
+        `HeyGen narration still rendering after 10 minutes (video_id=${videoId}). ` +
+          `It may still complete in your HeyGen dashboard — open app.heygen.com to retrieve it.`,
+      );
     }
   }
 }
