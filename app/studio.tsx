@@ -10,6 +10,7 @@ type TranscriptLine = { ts: string; tag?: string; text: string };
 
 type BriefEvent =
   | { type: "log"; ts: string; tag: string; text: string }
+  | { type: "progress"; percent: number; stage: string }
   | { type: "paper"; paper: { title: string; authors: string[]; id: string } }
   | { type: "brief"; brief: { hook: string; script: string; beats: unknown[] } }
   | { type: "narrator"; videoUrl: string; durationSeconds: number }
@@ -50,9 +51,16 @@ export default function Studio() {
   const [transcript, setTranscript] = useState<TranscriptLine[]>([]);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [narratorUrl, setNarratorUrl] = useState<string | null>(null);
+  const [percent, setPercent] = useState(0);
+  const [stageLabel, setStageLabel] = useState("");
   const transcriptEnd = useRef<HTMLDivElement>(null);
 
   const handleEvent = useCallback((e: BriefEvent) => {
+    if (e.type === "progress") {
+      setPercent(e.percent);
+      setStageLabel(e.stage);
+      return;
+    }
     if (e.type === "log") {
       setTranscript((prev) => [...prev, { ts: e.ts, tag: e.tag, text: e.text }]);
       // Drive coarse stage from tag so the spinner caption reads accurately.
@@ -91,6 +99,8 @@ export default function Studio() {
     setTranscript([]);
     setPreviewUrl(null);
     setNarratorUrl(null);
+    setPercent(0);
+    setStageLabel(isResume ? "rendering narrator" : "fetching paper");
 
     let res: Response;
     try {
@@ -240,7 +250,9 @@ export default function Studio() {
               <span className="ml-auto flex items-center gap-2 text-sm opacity-70">
                 {running ? (
                   <>
-                    <span className="font-pixel text-[8px] uppercase">{stage}</span>
+                    <span className="font-pixel text-[10px] tabular-nums text-primary">
+                      {percent}%
+                    </span>
                     <span className="spinner" style={{ transform: "scale(0.6)" }}>
                       <i /><i /><i /><i />
                     </span>
@@ -320,19 +332,36 @@ export default function Studio() {
                   <div className="w-full max-w-md">
                     <div className="spinner-bar mb-2" />
                     <div className="font-pixel text-[9px] uppercase text-center opacity-80">
-                      Hyperframes is composing the timeline…
+                      Hyperframes is composing the timeline… {percent}%
                     </div>
                   </div>
                 </div>
               ) : running ? (
-                <div className="flex flex-col items-center gap-5">
-                  <div className="spinner">
-                    <i /><i /><i /><i />
+                <div className="flex flex-col items-center gap-5 w-full max-w-md">
+                  <div className="font-pixel text-6xl md:text-7xl tracking-tighter">
+                    {percent}%
                   </div>
-                  <div className="font-pixel text-[10px] uppercase tracking-wider">
-                    {STAGE_LABEL[stage]}
+                  <div className="w-full h-5 border-4 border-foreground bg-secondary relative overflow-hidden">
+                    <div
+                      className="absolute inset-y-0 left-0"
+                      style={{
+                        width: `${percent}%`,
+                        background:
+                          "repeating-linear-gradient(-45deg, var(--primary) 0, var(--primary) 8px, var(--accent) 8px, var(--accent) 16px)",
+                        animation: "bar-march 0.8s linear infinite",
+                        transition: "width 0.4s ease",
+                      }}
+                    />
                   </div>
-                  <div className="w-72 spinner-bar" />
+                  <div className="font-pixel text-[10px] uppercase tracking-wider opacity-80 text-center">
+                    {stageLabel || STAGE_LABEL[stage]}
+                  </div>
+                  <div className="spinner" style={{ transform: "scale(0.7)" }}>
+                    <i />
+                    <i />
+                    <i />
+                    <i />
+                  </div>
                 </div>
               ) : (
                 <div className="text-center opacity-60">

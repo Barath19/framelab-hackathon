@@ -11,12 +11,21 @@ export const maxDuration = 800;
 
 type Event =
   | { type: "log"; ts: string; tag: string; text: string }
+  | { type: "progress"; percent: number; stage: string }
   | { type: "paper"; paper: ArxivPaper }
   | { type: "brief"; brief: Brief }
   | { type: "narrator"; videoUrl: string; durationSeconds: number }
   | { type: "composition"; id: string; previewUrl: string }
   | { type: "done" }
   | { type: "error"; message: string };
+
+/** Stage→percent bands. HeyGen is the longest leg so it owns the biggest band. */
+const BANDS = {
+  fetch: { start: 2, end: 10, label: "fetching paper" },
+  reading: { start: 10, end: 22, label: "reading paper" },
+  heygen: { start: 25, end: 95, label: "rendering narrator" },
+  compose: { start: 95, end: 100, label: "composing" },
+} as const;
 
 export async function POST(req: Request) {
   const body = (await req.json()) as { url?: string; videoId?: string };
@@ -34,6 +43,8 @@ export async function POST(req: Request) {
         return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
       };
       const log = (tag: string, text: string) => send({ type: "log", ts: stamp(), tag, text });
+      const progress = (percent: number, stage: string) =>
+        send({ type: "progress", percent: Math.max(0, Math.min(100, Math.round(percent))), stage });
 
       try {
         let paper: ArxivPaper;
@@ -46,6 +57,7 @@ export async function POST(req: Request) {
           // returns. The pending record was written when the original run
           // first kicked off narration.
           videoId = body.videoId;
+          progress(BANDS.heygen.start, BANDS.heygen.label);
           log("RESUME", `Looking up cached metadata for video_id=${videoId}…`);
           const cached = getComposition(videoId);
           if (!cached) {
@@ -60,8 +72,10 @@ export async function POST(req: Request) {
           send({ type: "brief", brief });
         } else {
           // ===== FULL RUN =====
+          progress(BANDS.fetch.start, BANDS.fetch.label);
           log("FETCH", `Resolving ${body.url}…`);
           paper = await fetchArxivPaper(body.url!);
+          progress(BANDS.fetch.end, BANDS.fetch.label);
           log(
             "PAPER",
             `${paper.title.slice(0, 80)}${paper.title.length > 80 ? "…" : ""} — ${paper.authors.slice(0, 2).join(", ")}${paper.authors.length > 2 ? " et al." : ""}`,
@@ -69,6 +83,7 @@ export async function POST(req: Request) {
           log("FIGURES", `${paper.figures.length} figure${paper.figures.length === 1 ? "" : "s"} extracted.`);
           send({ type: "paper", paper });
 
+          progress(BANDS.reading.start, BANDS.reading.label);
           log("READING", "Asking GPT-4o for the 20-second brief + visual beats…");
           brief = await generateBrief(paper);
           const wc = brief.script.split(/\s+/).filter(Boolean).length;
@@ -76,6 +91,7 @@ export async function POST(req: Request) {
             "BRIEF",
             `${wc} words · ${brief.beats.length} beats. Hook: "${brief.hook.slice(0, 80)}${brief.hook.length > 80 ? "…" : ""}"`,
           );
+          progress(BANDS.reading.end, BANDS.reading.label);
           send({ type: "brief", brief });
 
           // Clamp script for the ~20s budget.
@@ -109,16 +125,27 @@ export async function POST(req: Request) {
         }
 
         // ===== Both modes converge here: poll → compose =====
+        progress(BANDS.heygen.start, BANDS.heygen.label);
+        const EXPECTED_HEYGEN_SECS = 60;
         const clip = await pollNarration(videoId, {
           onStatus: (s) => log("HEYGEN", `status: ${s}`),
-          onTick: (elapsed) => log("HEYGEN", `still rendering… ${elapsed}s elapsed`),
+          onTick: (elapsed) => {
+            log("HEYGEN", `still rendering… ${elapsed}s elapsed`);
+            // Asymptote within the heygen band — never quite hit 95 until done.
+            const frac = 1 - Math.exp(-elapsed / EXPECTED_HEYGEN_SECS);
+            const pct =
+              BANDS.heygen.start + frac * (BANDS.heygen.end - BANDS.heygen.start - 2);
+            progress(pct, BANDS.heygen.label);
+          },
         });
+        progress(BANDS.heygen.end, BANDS.heygen.label);
         log(
           "HEYGEN",
           `ready — ${clip.durationSeconds.toFixed(1)}s narrator clip.`,
         );
         send({ type: "narrator", videoUrl: clip.videoUrl, durationSeconds: clip.durationSeconds });
 
+        progress(BANDS.compose.start, BANDS.compose.label);
         log("COMPOSE", "Hyperframes composition: chyron + PIP + per-beat figures/equations…");
         const html = buildComposition({
           paper,
@@ -143,6 +170,7 @@ export async function POST(req: Request) {
 
         const previewUrl = `/api/compositions/${videoId}`;
         log("COMPOSE", `Composition ready — ${html.length} bytes. Previewing…`);
+        progress(100, "done");
         send({ type: "composition", id: videoId, previewUrl });
 
         send({ type: "done" });
