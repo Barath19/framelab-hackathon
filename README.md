@@ -12,8 +12,6 @@ opened a dashboard.
 
 ![Architecture · How the morning brief gets built](docs/architecture.png)
 
-Built for the **HeyGen Hackathon**, San Francisco, May 14–15, 2026.
-
 ---
 
 ## The product
@@ -116,6 +114,3 @@ To enable Slack delivery:
               #northstarmetrics  ✓
 ```
 
-## Built at
-
-HeyGen Hackathon · San Francisco · May 14–15, 2026
