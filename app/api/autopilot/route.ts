@@ -10,7 +10,13 @@ import { fetchArxivPaper } from "@/lib/tools/arxiv";
 import { generateBrief } from "@/lib/tools/brief";
 import { pollNarration, startNarration } from "@/lib/tools/narrator";
 import { buildComposition } from "@/lib/tools/compose";
-import { saveComposition } from "@/lib/store";
+import {
+  downloadAsset,
+  hasLocalVideo,
+  localThumbPath,
+  localVideoPath,
+  saveComposition,
+} from "@/lib/store";
 
 export const runtime = "nodejs";
 export const maxDuration = 800;
@@ -74,12 +80,24 @@ export async function POST(req: Request) {
               onStatus: (s) => log(tag, `HeyGen: ${s}`),
               onTick: (e) => log(tag, `HeyGen rendering… ${e}s`),
             });
-            log(tag, `Narrator ready (${clip.durationSeconds.toFixed(1)}s).`);
+            log(tag, `Narrator ready (${clip.durationSeconds.toFixed(1)}s). Caching locally…`);
+            try {
+              await downloadAsset(clip.videoUrl, localVideoPath(videoId));
+              if (clip.thumbnailUrl) await downloadAsset(clip.thumbnailUrl, localThumbPath(videoId));
+            } catch (err) {
+              log(tag, `local cache failed: ${err instanceof Error ? err.message : String(err)}`);
+            }
+            const localNarrator = hasLocalVideo(videoId)
+              ? `/api/videos/${videoId}`
+              : clip.videoUrl;
+            const localThumb = hasLocalVideo(videoId)
+              ? `/api/thumbs/${videoId}`
+              : clip.thumbnailUrl;
 
             const html = buildComposition({
               paper,
               brief,
-              narratorUrl: clip.videoUrl,
+              narratorUrl: localNarrator,
               durationSeconds: clip.durationSeconds,
             });
             saveComposition(
@@ -87,8 +105,8 @@ export async function POST(req: Request) {
                 id: videoId,
                 paper,
                 brief,
-                narratorUrl: clip.videoUrl,
-                thumbnailUrl: clip.thumbnailUrl,
+                narratorUrl: localNarrator,
+                thumbnailUrl: localThumb,
                 durationSeconds: clip.durationSeconds,
                 createdAt: Date.now(),
                 pending: false,

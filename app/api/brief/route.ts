@@ -2,7 +2,14 @@ import { fetchArxivPaper } from "@/lib/tools/arxiv";
 import { generateBrief } from "@/lib/tools/brief";
 import { pollNarration, startNarration } from "@/lib/tools/narrator";
 import { buildComposition } from "@/lib/tools/compose";
-import { getComposition, saveComposition } from "@/lib/store";
+import {
+  downloadAsset,
+  getComposition,
+  hasLocalVideo,
+  localThumbPath,
+  localVideoPath,
+  saveComposition,
+} from "@/lib/store";
 import type { ArxivPaper } from "@/lib/tools/arxiv";
 import type { Brief } from "@/lib/tools/brief";
 
@@ -53,9 +60,6 @@ export async function POST(req: Request) {
 
         if (body.videoId) {
           // ===== RESUME MODE =====
-          // Need cached metadata for this videoId so we can compose once HeyGen
-          // returns. The pending record was written when the original run
-          // first kicked off narration.
           videoId = body.videoId;
           progress(BANDS.heygen.start, BANDS.heygen.label);
           log("RESUME", `Looking up cached metadata for video_id=${videoId}…`);
@@ -70,6 +74,40 @@ export async function POST(req: Request) {
           log("RESUME", `Found cached paper: ${paper.title.slice(0, 70)}…`);
           send({ type: "paper", paper });
           send({ type: "brief", brief });
+
+          // ===== LOCAL FAST-PATH =====
+          // If we already have the MP4 on disk, skip HeyGen entirely and
+          // compose straight from the local file. This is what makes the
+          // demo deterministic + offline-friendly.
+          if (hasLocalVideo(videoId)) {
+            log("LOCAL", "Found local MP4 — skipping HeyGen, composing instantly.");
+            progress(BANDS.compose.start, BANDS.compose.label);
+            const localUrl = `/api/videos/${videoId}`;
+            const html = buildComposition({
+              paper,
+              brief,
+              narratorUrl: localUrl,
+              durationSeconds: cached.durationSeconds || 20,
+            });
+            saveComposition(
+              {
+                ...cached,
+                narratorUrl: localUrl,
+                pending: false,
+              },
+              html,
+            );
+            send({
+              type: "narrator",
+              videoUrl: localUrl,
+              durationSeconds: cached.durationSeconds || 20,
+            });
+            progress(100, "done");
+            send({ type: "composition", id: videoId, previewUrl: `/api/compositions/${videoId}` });
+            send({ type: "done" });
+            controller.close();
+            return;
+          }
         } else {
           // ===== FULL RUN =====
           progress(BANDS.fetch.start, BANDS.fetch.label);
@@ -142,18 +180,42 @@ export async function POST(req: Request) {
           },
         });
         progress(BANDS.heygen.end, BANDS.heygen.label);
+
+        // ===== DOWNLOAD TO LOCAL =====
+        // HeyGen returns a signed S3 URL that expires within 24h. Pull the
+        // bytes down now so demos and the channel page keep working forever.
+        log("LOCAL", "Downloading narrator MP4 + thumbnail to local cache…");
+        try {
+          await downloadAsset(clip.videoUrl, localVideoPath(videoId));
+          if (clip.thumbnailUrl) {
+            await downloadAsset(clip.thumbnailUrl, localThumbPath(videoId));
+          }
+          log("LOCAL", "Cached. Composition will reference /api/videos/<id>.");
+        } catch (err) {
+          log(
+            "LOCAL",
+            `download failed: ${err instanceof Error ? err.message : String(err)} — falling back to signed URL.`,
+          );
+        }
+
+        const localNarrator = hasLocalVideo(videoId)
+          ? `/api/videos/${videoId}`
+          : clip.videoUrl;
+        const localThumb = hasLocalVideo(videoId)
+          ? `/api/thumbs/${videoId}`
+          : clip.thumbnailUrl;
         log(
           "HEYGEN",
           `ready — ${clip.durationSeconds.toFixed(1)}s narrator clip.`,
         );
-        send({ type: "narrator", videoUrl: clip.videoUrl, durationSeconds: clip.durationSeconds });
+        send({ type: "narrator", videoUrl: localNarrator, durationSeconds: clip.durationSeconds });
 
         progress(BANDS.compose.start, BANDS.compose.label);
         log("COMPOSE", "Hyperframes composition: chyron + PIP + per-beat figures/equations…");
         const html = buildComposition({
           paper,
           brief,
-          narratorUrl: clip.videoUrl,
+          narratorUrl: localNarrator,
           durationSeconds: clip.durationSeconds,
         });
 
@@ -162,8 +224,8 @@ export async function POST(req: Request) {
             id: videoId,
             paper,
             brief,
-            narratorUrl: clip.videoUrl,
-            thumbnailUrl: clip.thumbnailUrl,
+            narratorUrl: localNarrator,
+            thumbnailUrl: localThumb,
             durationSeconds: clip.durationSeconds,
             createdAt: Date.now(),
             pending: false,

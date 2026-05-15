@@ -17,6 +17,8 @@ import type { Brief } from "./tools/brief";
 
 const ROOT = path.resolve(process.cwd(), ".data");
 const HTML_DIR = path.join(ROOT, "compositions");
+const VIDEO_DIR = path.join(ROOT, "videos");
+const THUMB_DIR = path.join(ROOT, "thumbnails");
 const INDEX = path.join(ROOT, "compositions.json");
 
 export type CompositionRecord = {
@@ -34,8 +36,41 @@ export type CompositionRecord = {
 type Indexed = Omit<CompositionRecord, never>;
 
 function ensureDirs() {
-  if (!fs.existsSync(ROOT)) fs.mkdirSync(ROOT, { recursive: true });
-  if (!fs.existsSync(HTML_DIR)) fs.mkdirSync(HTML_DIR, { recursive: true });
+  for (const d of [ROOT, HTML_DIR, VIDEO_DIR, THUMB_DIR]) {
+    if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
+  }
+}
+
+export function localVideoPath(id: string): string {
+  return path.join(VIDEO_DIR, `${id}.mp4`);
+}
+
+export function localThumbPath(id: string): string {
+  return path.join(THUMB_DIR, `${id}.jpg`);
+}
+
+export function hasLocalVideo(id: string): boolean {
+  return fs.existsSync(localVideoPath(id));
+}
+
+export function hasLocalThumb(id: string): boolean {
+  return fs.existsSync(localThumbPath(id));
+}
+
+/**
+ * Download a remote (HeyGen signed) URL to local disk. The signed URLs
+ * expire within 24h; pulling them down means our compositions stay
+ * playable forever.
+ */
+export async function downloadAsset(
+  url: string,
+  dest: string,
+): Promise<void> {
+  ensureDirs();
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`download failed: ${res.status} ${url}`);
+  const buf = Buffer.from(await res.arrayBuffer());
+  fs.writeFileSync(dest, buf);
 }
 
 function readIndex(): Map<string, Indexed> {
