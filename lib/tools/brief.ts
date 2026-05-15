@@ -72,7 +72,7 @@ export async function generateBrief(source: Source): Promise<Brief> {
     meta = `Authors: ${source.authors.join(", ")}\nPublished: ${source.publishedAt}`;
   } else if (source.kind === "news") {
     meta = `Byline: ${source.authors.join(", ") || "—"}\nPublication: ${source.source || "—"}\nPublished: ${source.publishedAt}`;
-  } else {
+  } else if (source.kind === "repo") {
     const treeSample = source.tree
       .slice(0, 14)
       .map((n) => `${n.type === "dir" ? "📁" : "📄"} ${n.path}`)
@@ -84,6 +84,15 @@ export async function generateBrief(source: Source): Promise<Brief> {
       `Topics: ${source.topics.join(", ") || "—"}\n` +
       `Entry point: ${source.entry || "(not detected)"}\n` +
       `Top-level tree (first 14):\n${treeSample}`;
+  } else {
+    // metric (PostHog)
+    const tail = source.metric.series.slice(-7);
+    meta =
+      `Source: ${source.source}\n` +
+      `Event: ${source.metric.event} · Unit: ${source.metric.unit}\n` +
+      `Total ${source.metric.total.toLocaleString()} · Peak ${source.metric.peak.value} on ${source.metric.peak.date}\n` +
+      `Week-over-week: ${source.metric.weekOverWeekPct >= 0 ? "+" : ""}${source.metric.weekOverWeekPct}%\n` +
+      `Last 7 days:\n${tail.map((p) => `  ${p.date}: ${p.value}`).join("\n")}`;
   }
 
   const userMsg = `Source kind: ${kindLabel}

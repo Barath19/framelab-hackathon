@@ -105,7 +105,7 @@ Abstract: ${sourceBody(source).slice(0, 800)}`;
   } else if (source.kind === "news") {
     sourceBlock = `Article: "${source.title}" — ${source.source || "(source)"}
 Lede: ${sourceBody(source).slice(0, 800)}`;
-  } else {
+  } else if (source.kind === "repo") {
     const treeSample = source.tree
       .slice(0, 16)
       .map((n) => `${n.type === "dir" ? "[dir]" : "[file]"} ${n.path}`)
@@ -115,6 +115,15 @@ Description: ${source.abstract.slice(0, 500)}
 Entry point: ${source.entry || "(unknown)"}
 Top-level tree:
 ${treeSample}`;
+  } else {
+    // metric
+    const tail = source.metric.series.slice(-7);
+    sourceBlock = `Metric: "${source.title}" (${source.metric.event}, ${source.metric.unit})
+Source: ${source.source}
+Total ${source.metric.total.toLocaleString()} · peak ${source.metric.peak.value} on ${source.metric.peak.date}
+Last week vs prior: ${source.metric.weekOverWeekPct >= 0 ? "+" : ""}${source.metric.weekOverWeekPct}%
+Last 7 datapoints (date → value):
+${tail.map((p) => `  ${p.date}: ${p.value}`).join("\n")}`;
   }
 
   const userMsg = `${sourceBlock}

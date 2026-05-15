@@ -8,8 +8,9 @@
 import type { ArxivPaper } from "./arxiv";
 import type { NewsArticle, NewsFigure } from "./news";
 import type { RepoSource } from "./repo";
+import type { MetricSource } from "./posthog";
 
-export type Source = ArxivPaper | NewsArticle | RepoSource;
+export type Source = ArxivPaper | NewsArticle | RepoSource | MetricSource;
 
 export function sourceKindLabel(s: Source): string {
   switch (s.kind) {
@@ -19,6 +20,8 @@ export function sourceKindLabel(s: Source): string {
       return "NEWS ARTICLE";
     case "repo":
       return "CODE REPOSITORY";
+    case "metric":
+      return "NORTH-STAR METRIC";
   }
 }
 
