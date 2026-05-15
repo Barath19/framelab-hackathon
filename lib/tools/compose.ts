@@ -218,6 +218,54 @@ ${beatsHtml}
     ${beatsGsap}
     window.__timelines["brief"] = tl;
   </script>
+
+  <!--
+    Minimal Hyperframes-compatible runtime, inlined for iframe preview.
+    The narrator <video> is the single time source: it drives both clip
+    visibility (data-start / data-duration) and the GSAP beat timeline.
+    Once the real Hyperframes Studio embeds this composition, it will
+    pick up the same data attributes and timeline — this script is
+    only here to make the standalone iframe play without the runtime.
+  -->
+  <script>
+    (function () {
+      const root = document.querySelector('[data-composition-id]');
+      const clips = Array.from(document.querySelectorAll('.clip'));
+      // Hide track-2 (per-beat) clips initially; track-1 (PIP + chyron) stays visible.
+      for (const c of clips) {
+        if (c.dataset.trackIndex === '2') c.style.opacity = '0';
+        c.style.transition = 'opacity 0.35s ease';
+      }
+
+      const video = document.querySelector('.pip video');
+      const tl = (window.__timelines || {})['brief'];
+
+      function applyTime(t) {
+        for (const c of clips) {
+          if (c.dataset.trackIndex !== '2') continue;
+          const s = parseFloat(c.dataset.start);
+          const d = parseFloat(c.dataset.duration);
+          c.style.opacity = (t >= s && t < s + d) ? '1' : '0';
+        }
+        if (tl) tl.totalTime(t);
+      }
+
+      let raf;
+      function tick() {
+        applyTime(video.currentTime);
+        raf = requestAnimationFrame(tick);
+      }
+
+      if (video) {
+        video.addEventListener('play', () => { cancelAnimationFrame(raf); tick(); });
+        video.addEventListener('pause', () => cancelAnimationFrame(raf));
+        video.addEventListener('seeked', () => applyTime(video.currentTime));
+        video.addEventListener('loadedmetadata', () => applyTime(0));
+        // Some browsers block autoplay until the iframe is visible. Try to start.
+        video.play().catch(() => {});
+      }
+    })();
+  </script>
 </body>
 </html>`;
 }

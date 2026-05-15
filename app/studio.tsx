@@ -23,9 +23,29 @@ const EXAMPLES = [
   { label: "DPO — Direct Preference Optimization (2023)", url: "https://arxiv.org/abs/2305.18290" },
 ];
 
+type Stage =
+  | "idle"
+  | "fetching"
+  | "reading"
+  | "heygen"
+  | "composing"
+  | "done"
+  | "error";
+
+const STAGE_LABEL: Record<Stage, string> = {
+  idle: "",
+  fetching: "Fetching arXiv paper…",
+  reading: "GPT-4o reading paper, writing brief…",
+  heygen: "HeyGen rendering narrator clip (~100s)…",
+  composing: "Hyperframes composing the timeline…",
+  done: "Composition ready.",
+  error: "Something went wrong.",
+};
+
 export default function Studio() {
   const [url, setUrl] = useState("");
   const [running, setRunning] = useState(false);
+  const [stage, setStage] = useState<Stage>("idle");
   const [transcript, setTranscript] = useState<TranscriptLine[]>([]);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [narratorUrl, setNarratorUrl] = useState<string | null>(null);
@@ -34,10 +54,18 @@ export default function Studio() {
   const handleEvent = useCallback((e: BriefEvent) => {
     if (e.type === "log") {
       setTranscript((prev) => [...prev, { ts: e.ts, tag: e.tag, text: e.text }]);
+      // Drive coarse stage from tag so the spinner caption reads accurately.
+      if (e.tag === "FETCH" || e.tag === "PAPER" || e.tag === "FIGURES")
+        setStage("fetching");
+      else if (e.tag === "READING" || e.tag === "BRIEF" || e.tag === "CLAMP")
+        setStage("reading");
+      else if (e.tag === "HEYGEN") setStage("heygen");
+      else if (e.tag === "COMPOSE") setStage("composing");
     } else if (e.type === "narrator") {
       setNarratorUrl(e.videoUrl);
     } else if (e.type === "composition") {
       setPreviewUrl(e.previewUrl);
+      setStage("done");
     } else if (e.type === "done") {
       setRunning(false);
     } else if (e.type === "error") {
@@ -45,6 +73,7 @@ export default function Studio() {
         ...prev,
         { ts: "--:--", tag: "ERROR", text: e.message },
       ]);
+      setStage("error");
       setRunning(false);
     }
   }, []);
@@ -56,6 +85,7 @@ export default function Studio() {
   const submit = async () => {
     if (!url.trim() || running) return;
     setRunning(true);
+    setStage("fetching");
     setTranscript([]);
     setPreviewUrl(null);
     setNarratorUrl(null);
@@ -174,7 +204,18 @@ export default function Studio() {
             <div className="px-5 py-3 border-b-4 border-foreground bg-secondary flex items-center gap-3">
               <span className="font-pixel text-[10px] uppercase">Agent</span>
               <span className={`dot ${running ? "busy" : ""}`} />
-              <span className="ml-auto text-sm opacity-70">live reasoning</span>
+              <span className="ml-auto flex items-center gap-2 text-sm opacity-70">
+                {running ? (
+                  <>
+                    <span className="font-pixel text-[8px] uppercase">{stage}</span>
+                    <span className="spinner" style={{ transform: "scale(0.6)" }}>
+                      <i /><i /><i /><i />
+                    </span>
+                  </>
+                ) : (
+                  "live reasoning"
+                )}
+              </span>
             </div>
             <div className="flex-1 overflow-y-auto p-5 text-base leading-relaxed space-y-2 min-h-0">
               {transcript.length === 0 ? (
@@ -205,26 +246,61 @@ export default function Studio() {
           <Card className="col-span-7 flex flex-col min-h-0 overflow-hidden p-0">
             <div className="px-5 py-3 border-b-4 border-foreground bg-secondary flex items-center gap-3">
               <span className="font-pixel text-[10px] uppercase">Preview</span>
-              <span className="ml-auto text-sm opacity-70">
-                {previewUrl ? "composition" : narratorUrl ? "narrator only" : ""}
+              <span className="ml-auto flex items-center gap-2 text-sm">
+                {previewUrl ? (
+                  <>
+                    <span className="font-pixel text-[8px] uppercase px-1.5 py-0.5 border-2 border-foreground bg-foreground text-secondary">
+                      Hyperframes ✓
+                    </span>
+                    <span className="font-pixel text-[8px] uppercase px-1.5 py-0.5 border-2 border-foreground bg-foreground text-secondary">
+                      HeyGen ✓
+                    </span>
+                  </>
+                ) : narratorUrl ? (
+                  <span className="font-pixel text-[8px] uppercase px-1.5 py-0.5 border-2 border-foreground bg-foreground text-secondary">
+                    HeyGen ✓ — composing…
+                  </span>
+                ) : running ? (
+                  <span className="opacity-70">working…</span>
+                ) : null}
               </span>
             </div>
-            <div className="flex-1 bg-foreground/5 flex items-center justify-center p-5 min-h-0">
+            <div className="flex-1 bg-foreground/5 flex items-center justify-center p-5 min-h-0 relative">
               {previewUrl ? (
                 <iframe
                   src={previewUrl}
-                  className="w-full h-full bg-black"
+                  className="w-full h-full bg-black border-4 border-foreground"
                   style={{ aspectRatio: "16/9" }}
                   title="brief composition"
+                  allow="autoplay; encrypted-media"
                 />
               ) : narratorUrl ? (
-                // eslint-disable-next-line jsx-a11y/media-has-caption
-                <video
-                  src={narratorUrl}
-                  controls
-                  autoPlay
-                  className="max-w-full max-h-full bg-black"
-                />
+                <div className="flex flex-col items-center gap-4 w-full">
+                  {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                  <video
+                    src={narratorUrl}
+                    controls
+                    autoPlay
+                    muted
+                    className="max-w-full max-h-[60vh] bg-black border-4 border-foreground"
+                  />
+                  <div className="w-full max-w-md">
+                    <div className="spinner-bar mb-2" />
+                    <div className="font-pixel text-[9px] uppercase text-center opacity-80">
+                      Hyperframes is composing the timeline…
+                    </div>
+                  </div>
+                </div>
+              ) : running ? (
+                <div className="flex flex-col items-center gap-5">
+                  <div className="spinner">
+                    <i /><i /><i /><i />
+                  </div>
+                  <div className="font-pixel text-[10px] uppercase tracking-wider">
+                    {STAGE_LABEL[stage]}
+                  </div>
+                  <div className="w-72 spinner-bar" />
+                </div>
               ) : (
                 <div className="text-center opacity-60">
                   <div className="font-pixel text-xs mb-3">NO PREVIEW YET</div>

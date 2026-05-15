@@ -120,6 +120,58 @@ html, body {
 .dot.gold  { background: var(--accent); }
 @keyframes dot-blink { 50% { opacity: 0.35; } }
 
+/* ====== Chunky 8-bit spinner (4 squares orbiting) ====== */
+.spinner {
+  display: inline-block;
+  width: 32px;
+  height: 32px;
+  position: relative;
+}
+.spinner i {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: var(--primary);
+  border: 2px solid var(--foreground);
+  animation: spin-step 1s steps(4) infinite;
+}
+.spinner i:nth-child(1) { top: 0;     left: 0;     animation-delay: 0s; }
+.spinner i:nth-child(2) { top: 0;     right: 0;    animation-delay: -0.75s; }
+.spinner i:nth-child(3) { bottom: 0;  right: 0;    animation-delay: -0.5s; }
+.spinner i:nth-child(4) { bottom: 0;  left: 0;     animation-delay: -0.25s; }
+@keyframes spin-step {
+  0%   { background: var(--primary); }
+  25%  { background: var(--accent); }
+  50%  { background: var(--ink-mute); }
+  75%  { background: var(--foreground); }
+  100% { background: var(--primary); }
+}
+
+.spinner-bar {
+  height: 12px;
+  background: var(--secondary);
+  border: 3px solid var(--foreground);
+  position: relative;
+  overflow: hidden;
+}
+.spinner-bar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--primary) 0,
+    var(--primary) 8px,
+    var(--accent) 8px,
+    var(--accent) 16px
+  );
+  animation: bar-march 0.8s linear infinite;
+}
+@keyframes bar-march {
+  from { transform: translateX(0); }
+  to   { transform: translateX(16px); }
+}
+
 /* ====== Chunky scrollbars ====== */
 *::-webkit-scrollbar { width: 14px; height: 14px; }
 *::-webkit-scrollbar-track { background: var(--secondary); border-left: 3px solid var(--foreground); }
