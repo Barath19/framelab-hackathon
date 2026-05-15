@@ -8,6 +8,8 @@ composes it with animated charts in Hyperframes, renders a 1920×1080
 MP4, and posts it to your team's Slack channel — before anyone's
 opened a dashboard.
 
+![A frame from the morning brief — MRR line + ARR + HeyGen narrator PIP](docs/brief-mrr.png)
+
 ![Architecture · How the morning brief gets built](docs/architecture.png)
 
 Built for the **HeyGen Hackathon**, San Francisco, May 14–15, 2026.
