@@ -36,7 +36,7 @@ const STAGE_LABEL: Record<Stage, string> = {
   idle: "",
   fetching: "Fetching arXiv paper…",
   reading: "GPT-4o reading paper, writing brief…",
-  heygen: "HeyGen rendering narrator clip (~100s)…",
+  heygen: "HeyGen rendering 20s narrator clip (~30-60s)…",
   composing: "Hyperframes composing the timeline…",
   done: "Composition ready.",
   error: "Something went wrong.",

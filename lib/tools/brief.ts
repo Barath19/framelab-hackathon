@@ -18,21 +18,18 @@ export type Brief = {
 };
 
 const SYSTEM = `You are an AI science communicator. You have just read a research paper.
-Your job: write a 75-second video narration that explains the paper to a smart non-expert,
-and a parallel list of "beats" that direct what should be visible on screen at each time.
+Your job: write a punchy 20-second video narration that explains the paper to a smart non-expert,
+plus a parallel list of "beats" directing what should appear on screen at each moment.
 
 Rules:
-- The script should sound natural for spoken delivery. Around 180-200 words.
-- Open with a hook in one sentence.
-- Cover: what problem, what idea, what evidence, why it matters.
-- End with a one-line "if you want more, read the full paper" CTA.
-- The beats array sequences visual moments to the timeline. The avatar is in
-  a small PIP; the rest of the canvas shows beat content.
-- Beat times must be monotonically increasing and fit within 0..75s.
-- Use 4-7 beats total. Pace: ~10-15s per beat.
+- The script must sound natural spoken aloud. Around 55-65 words total.
+- Open with a one-sentence hook.
+- Cover: the problem, the idea, why it matters. Skip the evidence — there's no time.
+- End with a half-second "read the full paper" CTA line.
+- Use 3-4 beats total spanning 0..20s. Pace: ~5-7s per beat.
 - 'figure' beats reference figure indexes from the paper's figures array.
 - 'equation' beats use plain LaTeX (no $$ markers).
-- Always start with { at: 0, show: { type: 'title' } } and end with { type: 'cta' } near 70s.
+- Always start with { at: 0, show: { type: 'title' } } and end with { type: 'cta' } around 17s.
 
 Return ONLY JSON. No prose, no markdown.
 

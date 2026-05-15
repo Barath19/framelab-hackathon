@@ -52,15 +52,17 @@ export async function POST(req: Request) {
         );
         send({ type: "brief", brief });
 
-        // Clamp script defensively — HeyGen will refuse / produce overlong
-        // clips if the LLM ignored the 75s budget.
-        const MAX_CHARS = 1400;
+        // Clamp script defensively to keep the HeyGen clip at ~20s (~65 words / ~400 chars).
+        const MAX_CHARS = 420;
         const script =
           brief.script.length > MAX_CHARS
-            ? brief.script.slice(0, MAX_CHARS).replace(/\S*$/, "").trim() + "…"
+            ? brief.script.slice(0, MAX_CHARS).replace(/\S*$/, "").trim() + "."
             : brief.script;
         if (script.length < brief.script.length) {
-          log("CLAMP", `Trimmed script ${brief.script.length} → ${script.length} chars to keep clip under ~100s.`);
+          log(
+            "CLAMP",
+            `Trimmed script ${brief.script.length} → ${script.length} chars to keep clip ≤ ~20s.`,
+          );
         }
 
         log("HEYGEN", `Submitting ${script.length}-char narration to HeyGen…`);
