@@ -1,9 +1,5 @@
 # framelab
 
-**Your weekly metrics, as a 35-second video.**
-
-🌐 Live → **https://framelab-hackathon.vercel.app**
-
 Every Monday morning at 8 AM, framelab pulls live data from PostHog
 (DAU · WAU · MRR · ARR · signups), generates a HeyGen avatar narrator,
 composes it with animated charts in Hyperframes, renders a 1920×1080
