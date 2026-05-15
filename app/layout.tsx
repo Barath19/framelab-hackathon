@@ -15,9 +15,9 @@ const vt323 = VT323({
 });
 
 export const metadata: Metadata = {
-  title: "MOTIF — a visual identity from your music",
+  title: "BRIEF — read everything. watch one thing.",
   description:
-    "Drop an MP3. Meet your AI Music Director. Get a Spotify Canvas, album cover, lyric video, and social cuts — all sharing one motif. Built on HeyGen and Hyperframes.",
+    "Paste an arXiv URL. The agent reads the paper and produces a 75-second video briefing: a HeyGen narrator over a Hyperframes composition with the actual figures, equations, and citations.",
 };
 
 export default function RootLayout({
